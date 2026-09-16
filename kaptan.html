@@ -52,6 +52,12 @@
   .ozet-picker select{ font-size:14px; flex:1; min-width:160px; }
   .ozet-picker{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 
+  .ceremony-reveal{ animation:ceremonyFadeIn .5s ease; }
+  @keyframes ceremonyFadeIn{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:translateY(0); } }
+  .ceremony-stage{ display:flex; align-items:center; justify-content:center; min-height:min(50vh,320px); }
+  .ceremony-round-title{ font-family:var(--font-display); font-weight:700; letter-spacing:1px; color:var(--accent); text-align:center; font-size:clamp(30px,11vw,52px); }
+  .ceremony-spotlight{ font-family:var(--font-display); font-weight:700; text-align:center; color:var(--accent-strong); padding:18px 8px; font-size:clamp(20px,8vw,32px); animation:ceremonySpotlightIn .45s ease; }
+  @keyframes ceremonySpotlightIn{ from{ opacity:0; transform:scale(.85); } to{ opacity:1; transform:scale(1); } }
   .day-group{ display:flex; flex-direction:column; gap:7px; }
   .day-head{ display:flex; align-items:baseline; gap:8px; padding-top:4px; }
   .day-head .d1{ font-family:var(--font-display); font-size:13px; }
@@ -150,7 +156,7 @@
   function freshState(){
     return {
       settings:{ startDate:DEFAULT_START_DATE, slot1Time:"17:00", slot2Time:"18:00", slot3Time:"19:00", matchesPerDay:2, rounds:4 },
-      teams:[], matches:[], drawnAt:null, playoff:null
+      teams:[], matches:[], drawnAt:null, playoff:null, draw:null
     };
   }
   function normalizePlayoffMatch(m){
@@ -183,7 +189,19 @@
     });
     if (d.drawnAt) f.drawnAt = d.drawnAt;
     f.playoff = normalizePlayoff(d.playoff);
+    f.draw = normalizeDraw(d.draw);
     return f;
+  }
+  function normalizeDraw(d){
+    if (!d || !Array.isArray(d.matches)) return null;
+    return {
+      round: d.round|0 || 1,
+      totalRounds: d.totalRounds|0 || 1,
+      phase: (d.phase==="intro"||d.phase==="revealing"||d.phase==="round-done") ? d.phase : "intro",
+      matches: d.matches.map(function(m){ return { home:m.home, away:m.away, homeShown:!!m.homeShown, awayShown:!!m.awayShown }; }),
+      spotlightIdx: (typeof d.spotlightIdx==="number") ? d.spotlightIdx : null,
+      spotlightSide: (d.spotlightSide==="home"||d.spotlightSide==="away") ? d.spotlightSide : null
+    };
   }
 
   function weekdayDates(startISO, count){
@@ -474,14 +492,48 @@
     return '<div class="stage">'+renderSummaryStrip(state)+yellowBlock+redBlock+'</div>';
   }
 
+  // Read-only mirror of admin.html's live draw ceremony — whatever admin is
+  // revealing right now (state.draw) shows up here the same way, via the
+  // same realtime row updates already used for everything else on this page.
+  function renderDrawCeremony(state){
+    var d = state.draw;
+    if (d.phase==="intro"){
+      return '<div class="stage"><div class="ceremony-stage"><div class="ceremony-round-title ceremony-reveal">'+d.round+'. HAFTA</div></div></div>';
+    }
+    var spotlightBlock = "";
+    if (d.phase==="revealing" && d.spotlightIdx!=null){
+      var sm = d.matches[d.spotlightIdx];
+      var teamId = d.spotlightSide==="home" ? sm.home : sm.away;
+      spotlightBlock = '<div class="ceremony-spotlight ceremony-reveal">'+esc(teamName(state,teamId))+'</div>';
+    }
+    var rows = d.matches.filter(function(m){ return m.homeShown; }).map(function(m){
+      return '<div class="match-row ceremony-reveal"><span class="side home">'+esc(teamName(state,m.home))+'</span><span class="vs mono">vs</span><span class="side">'+(m.awayShown?esc(teamName(state,m.away)):'<span class="note">…</span>')+'</span></div>';
+    }).join('');
+    var listBlock = rows ? ('<div class="day-group" style="margin-top:14px">'+rows+'</div>') : '';
+    var note = d.phase==="round-done"
+      ? '<p class="note" style="margin-top:8px">'+d.round+'. hafta tamamlandı — yönetici bir sonraki haftayı başlatacak.</p>'
+      : '';
+    return '<div class="stage" id="ceremonyStage">' +
+      '<div class="panel"><div class="section-head"><h2>'+d.round+'. Hafta Kurası'+(d.phase==="round-done"?" — tamamlandı":" — çekiliyor")+'</h2></div>' +
+        spotlightBlock + note +
+      '</div>' + listBlock +
+    '</div>';
+  }
+
   function render(){
     document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.tab===uiTab); });
+    if (state.draw){
+      document.getElementById("content").innerHTML = renderDrawCeremony(state);
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior:"smooth" });
+      return;
+    }
     var renderers = { ozet:renderOzet, fikstur:renderFikstur, puan:renderPuanDurumu, playoff:renderPlayoff, krallik:renderGolKrallik, kartlar:renderKartlar };
     var fn = renderers[uiTab] || renderOzet;
     document.getElementById("content").innerHTML = fn(state);
   }
 
   document.getElementById("tabs").addEventListener("click", function(e){
+    if (state.draw) return;
     var btn = e.target.closest(".tab-btn");
     if (!btn) return;
     uiTab = btn.dataset.tab;
