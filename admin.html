@@ -76,6 +76,8 @@
   .btn[disabled]{ opacity:.5; cursor:default; }
 
   .day-group{ display:flex; flex-direction:column; gap:7px; }
+  .ceremony-reveal{ animation:ceremonyFadeIn .5s ease; }
+  @keyframes ceremonyFadeIn{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:translateY(0); } }
   .day-head{ display:flex; align-items:baseline; gap:8px; padding-top:4px; }
   .day-head .d1{ font-family:var(--font-display); font-size:14px; }
   .day-head .d2{ font-family:var(--font-mono); font-size:11px; color:var(--ink-muted); }
@@ -564,17 +566,62 @@
     var scheduled = scheduleWithRest(flat, ids, state.settings.matchesPerDay, state.settings.startDate);
     return { matches: scheduled, rounds: rounds };
   }
-  // No live reveal ceremony here (that is specific to the Claude Artifact
-  // version) — the draw is computed and applied immediately.
+  // Live reveal ceremony: matches are computed instantly but revealed one by
+  // one (grouped by week/round) with a short pause between each, mirroring
+  // the original draw-day ceremony. Final state is only applied/persisted
+  // once the reveal finishes (or is skipped).
+  var CEREMONY_STEP_MS = 2300;
+  var ceremony = null;
   function startDraw(){
     var n = state.teams.length;
     if (n<2){ toast("En az 2 takım gerekli."); return; }
     var computed = computeDraw();
-    state.matches = computed.matches;
-    state.settings.rounds = computed.rounds;
+    var revealOrder = computed.matches.slice().sort(function(a,b){ return a.round - b.round; });
+    ceremony = { matches: computed.matches, rounds: computed.rounds, revealOrder: revealOrder, shown: [], timer: null };
+    render();
+    ceremonyStep();
+  }
+  function ceremonyStep(){
+    if (!ceremony) return;
+    if (ceremony.shown.length >= ceremony.revealOrder.length){ finishCeremony(); return; }
+    ceremony.shown.push(ceremony.revealOrder[ceremony.shown.length]);
+    render();
+    ceremony.timer = setTimeout(ceremonyStep, CEREMONY_STEP_MS);
+  }
+  function skipCeremony(){
+    if (!ceremony) return;
+    if (ceremony.timer) clearTimeout(ceremony.timer);
+    ceremony.shown = ceremony.revealOrder.slice();
+    finishCeremony();
+  }
+  function finishCeremony(){
+    if (!ceremony) return;
+    if (ceremony.timer) clearTimeout(ceremony.timer);
+    state.matches = ceremony.matches;
+    state.settings.rounds = ceremony.rounds;
     state.drawnAt = new Date().toISOString();
+    ceremony = null;
     render(); persist();
     toast("Kura çekildi.");
+  }
+  function renderCeremony(){
+    var groups = {}, order = [];
+    ceremony.shown.forEach(function(m){
+      if (!groups[m.round]){ groups[m.round]=[]; order.push(m.round); }
+      groups[m.round].push(m);
+    });
+    var html = order.map(function(r){
+      var rows = groups[r].map(function(m){
+        return '<div class="match-row ceremony-reveal"><span class="side home">'+esc(teamName(state,m.home))+'</span><span class="vs mono">vs</span><span class="side">'+esc(teamName(state,m.away))+'</span></div>';
+      }).join('');
+      return '<div class="day-group"><div class="day-head"><span class="d1">'+r+'. HAFTA</span></div>'+rows+'</div>';
+    }).join('') || '<div class="panel note">Eşleşmeler birazdan görünecek…</div>';
+    var total = ceremony.revealOrder.length, done = ceremony.shown.length;
+    return '<div class="stage">' +
+      '<div class="panel"><div class="section-head"><h2>Kura Çekiliyor…</h2><span class="section-sub">'+done+' / '+total+'</span></div>' +
+        '<div class="btn-row" style="margin-top:10px"><button class="btn btn-ghost" data-action="skip-ceremony">Hemen Göster</button></div></div>' +
+      html +
+    '</div>';
   }
   function doReset(){
     state.matches = [];
@@ -969,6 +1016,7 @@
 
   function render(){
     document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.tab===uiTab); });
+    if (ceremony){ document.getElementById("content").innerHTML = renderCeremony(); return; }
     var renderers = { admin:renderAdmin, ozet:renderOzet, puan:renderPuanDurumu, playoff:renderPlayoff, krallik:renderGolKrallik, kartlar:renderKartlar };
     var fn = renderers[uiTab] || renderAdmin;
     document.getElementById("content").innerHTML = fn(state);
@@ -976,6 +1024,7 @@
 
   // ---- events ----
   document.getElementById("tabs").addEventListener("click", function(e){
+    if (ceremony) return;
     var btn = e.target.closest(".tab-btn");
     if (!btn) return;
     uiTab = btn.dataset.tab;
@@ -992,6 +1041,7 @@
     if (!btn) return;
     var action = btn.dataset.action;
     if (action==="draw") startDraw();
+    else if (action==="skip-ceremony") skipCeremony();
     else if (action==="bulk-add") addTeamsFromBulk();
     else if (action==="bulk-add-player") addPlayersFromBulk();
     else if (action==="reset-ask"){ uiState.confirmReset=true; render(); }
