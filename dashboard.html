@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turnuva Panosu</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+  :root{
+    --bg:#0E1712; --surface:#16211B; --surface-2:#1D2A22; --ink:#EFF3EA; --ink-muted:#9BAA9C;
+    --border:#2B3A30; --accent:#4CAE7C; --accent-strong:#6FC896; --accent-ink:#0E1712;
+    --gold:#E3B15C; --gold-ink:#2A1D06; --brick:#E07A5F;
+    --font-display:'Oswald',sans-serif; --font-body:'IBM Plex Sans',sans-serif; --font-mono:'IBM Plex Mono',monospace;
+  }
+  * { box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:var(--bg); color:var(--ink); font-family:var(--font-body); overflow:hidden; }
+  h1,h2,h3{ font-family:var(--font-display); font-weight:600; margin:0; }
+  .mono{ font-family:var(--font-mono); }
+  .wrap{ height:100vh; display:flex; flex-direction:column; padding:26px 40px; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; padding-bottom:18px; border-bottom:2px solid var(--surface-2); }
+  .brand{ display:flex; align-items:center; gap:16px; }
+  .crest{ color:var(--accent); }
+  .brand-eyebrow{ font-family:var(--font-mono); font-size:15px; letter-spacing:2px; color:var(--ink-muted); text-transform:uppercase; display:block; }
+  .brand h1{ font-size:34px; }
+  .clock{ text-align:right; }
+  .clock .time{ font-family:var(--font-mono); font-size:30px; font-variant-numeric:tabular-nums; }
+  .clock .date{ font-size:15px; color:var(--ink-muted); }
+
+  .slide{ flex:1; min-height:0; padding-top:22px; display:flex; flex-direction:column; gap:16px; }
+  .slide-title{ display:flex; align-items:baseline; justify-content:space-between; }
+  .slide-title h2{ font-size:28px; }
+  .slide-title .sub{ color:var(--ink-muted); font-size:17px; font-family:var(--font-mono); }
+
+  .empty{ flex:1; display:flex; align-items:center; justify-content:center; color:var(--ink-muted); font-size:22px; text-align:center; }
+
+  /* fixtures slide */
+  .match-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px; overflow:hidden; }
+  .match-card{ background:var(--surface); border:1px solid var(--surface-2); border-radius:10px; padding:16px 18px; display:flex; flex-direction:column; gap:10px; }
+  .match-card .tag{ font-family:var(--font-mono); font-size:13px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.6px; }
+  .match-card .pair{ display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:22px; }
+  .match-card .pair .t{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .match-card .pair .score{ font-family:var(--font-mono); font-weight:600; color:var(--accent-strong); flex:none; }
+  .match-card .pair .vs{ font-family:var(--font-mono); color:var(--ink-muted); font-size:15px; flex:none; }
+
+  /* standings slide */
+  table{ border-collapse:collapse; width:100%; }
+  .standings-table thead th{ text-align:left; font-family:var(--font-mono); font-size:14px; letter-spacing:.5px; text-transform:uppercase; color:var(--ink-muted); padding:8px 14px; border-bottom:2px solid var(--surface-2); }
+  .standings-table thead th.num{ text-align:center; }
+  .standings-table tbody td{ padding:9px 14px; border-bottom:1px solid var(--surface-2); font-size:19px; }
+  .standings-table tbody td.num{ text-align:center; font-family:var(--font-mono); }
+  .standings-table tbody tr.top8{ box-shadow:inset 4px 0 0 var(--accent); }
+  .rank{ font-family:var(--font-mono); color:var(--ink-muted); }
+  .pts{ font-weight:600; font-family:var(--font-mono); color:var(--accent-strong); }
+
+  /* scorers / cards slide */
+  .two-col{ flex:1; min-height:0; display:grid; grid-template-columns:1.2fr 1fr; gap:22px; }
+  .box{ background:var(--surface); border:1px solid var(--surface-2); border-radius:10px; padding:18px 20px; overflow:hidden; }
+  .box h3{ font-size:20px; margin-bottom:12px; }
+  .scorer-row{ display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--surface-2); font-size:19px; }
+  .scorer-row .rank{ width:26px; }
+  .scorer-row .n{ margin-left:auto; font-family:var(--font-mono); font-weight:600; color:var(--gold); }
+  .card-row{ display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--surface-2); font-size:17px; }
+  .susp-tag{ font-family:var(--font-mono); font-size:12px; color:var(--brick); margin-left:auto; white-space:nowrap; }
+
+  /* playoff slide */
+  .ko-cols{ flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; }
+  .ko-col{ display:flex; flex-direction:column; gap:12px; }
+  .ko-col h3{ font-size:16px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:1px; font-family:var(--font-mono); font-weight:500; }
+  .ko-card{ background:var(--surface); border:1px solid var(--surface-2); border-radius:9px; padding:12px 14px; display:flex; flex-direction:column; gap:6px; }
+  .ko-card.ko-final{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .ko-team{ display:flex; justify-content:space-between; font-size:15px; }
+  .ko-team.winner{ color:var(--accent-strong); font-weight:600; }
+  .ko-team.tbd{ color:var(--ink-muted); font-style:italic; }
+  .ko-score{ font-family:var(--font-mono); color:var(--ink-muted); font-size:13px; }
+
+  .dots{ display:flex; gap:8px; justify-content:center; padding-top:14px; }
+  .dot{ width:9px; height:9px; border-radius:50%; background:var(--surface-2); }
+  .dot.active{ background:var(--accent); }
+
+  .setup{ max-width:620px; margin:60px auto; background:var(--surface); border:1px solid var(--surface-2); border-radius:10px; padding:26px 30px; }
+  .setup input{ width:100%; margin-top:6px; margin-bottom:14px; padding:9px; border-radius:6px; border:1px solid var(--surface-2); background:var(--bg); color:var(--ink); font-family:inherit; }
+  .setup button{ background:var(--accent); color:var(--accent-ink); border:none; padding:10px 18px; border-radius:7px; font-family:var(--font-display); text-transform:uppercase; letter-spacing:.3px; font-weight:600; }
+
+  @media (max-width:900px){
+    .ko-cols{ grid-template-columns:1fr 1fr; }
+    .two-col{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+(function(){
+"use strict";
+
+// ============================================================================
+// Turnuva Panosu — salt-okunur TV panosu (ES5 + ham XMLHttpRequest, kütüphane
+// yok — eski smart-TV tarayıcı motorlarında çalışması için). Supabase'teki
+// TEK "turnuva_state" satırını (id="main") okur; admin.html ile aynı JSON
+// state şemasını paylaşır, bu yüzden hesaplama fonksiyonları (puan durumu,
+// gol krallığı, kartlar, playoff) admin.html'den neredeyse birebir taşındı.
+// ============================================================================
+
+var DAYS_TR = ["Pazar","Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi"];
+var DAYS_TR_SHORT = ["Paz","Pzt","Sal","Çar","Per","Cum","Cmt"];
+var MONTHS_TR = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+var SLIDE_MS = 14000;
+var POLL_MS = 25000;
+var PAGE_SIZE = 12;
+var DEFAULT_START_DATE = "2026-10-05";
+
+// BETEK Cup Supabase projesi — varsayılan bağlantı bilgisi, sayfa hiçbir
+// parametre/localStorage olmadan açılsa bile otomatik bağlansın diye.
+var DEFAULT_SUPABASE_URL = "https://arjecfiigkebkeccfpxi.supabase.co";
+var DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyamVjZmlpZ2tlYmtlY2NmcHhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NDg5NzEsImV4cCI6MjEwNTEyNDk3MX0.YhcLALmCr8IQjTuBZTkJKSjIW8TlXpT6oOzPcgAc2k8";
+
+function pad2(n){ return (n<10?"0":"")+n; }
+
+// ---- config: URL params win, then localStorage, then the default project above ----
+function readParam(name){
+  var m = new RegExp("[?&]"+name+"=([^&]+)").exec(window.location.search);
+  return m ? decodeURIComponent(m[1].replace(/\+/g," ")) : null;
+}
+function getConfig(){
+  var url = readParam("url");
+  var key = readParam("key");
+  if (url && key){
+    try{ localStorage.setItem("turnuva_supabase_url", url); localStorage.setItem("turnuva_supabase_key", key); }catch(e){}
+    return { url:url, key:key };
+  }
+  try{
+    return { url: localStorage.getItem("turnuva_supabase_url")||DEFAULT_SUPABASE_URL, key: localStorage.getItem("turnuva_supabase_key")||DEFAULT_SUPABASE_KEY };
+  }catch(e){ return {url:DEFAULT_SUPABASE_URL,key:DEFAULT_SUPABASE_KEY}; }
+}
+function setConfig(url,key){
+  try{ localStorage.setItem("turnuva_supabase_url", url); localStorage.setItem("turnuva_supabase_key", key); }catch(e){}
+}
+
+// ---- state (aynı JSON şekli admin.html ile) ----
+function freshState(){
+  return {
+    settings:{ startDate:DEFAULT_START_DATE, slot1Time:"17:00", slot2Time:"18:00", slot3Time:"19:00", matchesPerDay:2, rounds:4 },
+    teams:[], matches:[], drawnAt:null, playoff:null
+  };
+}
+function normalizePlayoffMatch(m){
+  if (!m) return { home:null, away:null, hs:null, as:null, events:[] };
+  return { home:m.home===undefined?null:m.home, away:m.away===undefined?null:m.away, hs:m.hs===undefined?null:m.hs, as:m.as===undefined?null:m.as, events:Array.isArray(m.events)?m.events:[] };
+}
+function normalizePlayoff(d){
+  if (!d || !d.active) return null;
+  return {
+    active:true, seeds:Array.isArray(d.seeds)?d.seeds:[],
+    qf:Array.isArray(d.qf)?d.qf.map(normalizePlayoffMatch):[],
+    sf:Array.isArray(d.sf)?d.sf.map(function(s,i){ var nm=normalizePlayoffMatch(s); nm.fromQF=Array.isArray(s&&s.fromQF)?s.fromQF:[i*2,i*2+1]; return nm; }):[],
+    final:normalizePlayoffMatch(d.final), third:normalizePlayoffMatch(d.third)
+  };
+}
+function normalizeState(d){
+  var f = freshState();
+  if (!d) return f;
+  if (d.settings){
+    if (d.settings.startDate) f.settings.startDate = d.settings.startDate;
+    if (d.settings.slot1Time) f.settings.slot1Time = d.settings.slot1Time;
+    if (d.settings.slot2Time) f.settings.slot2Time = d.settings.slot2Time;
+    if (d.settings.slot3Time) f.settings.slot3Time = d.settings.slot3Time;
+    f.settings.matchesPerDay = (d.settings.matchesPerDay===3) ? 3 : 2;
+    if (d.settings.rounds) f.settings.rounds = d.settings.rounds;
+  }
+  if (Array.isArray(d.teams)) f.teams = d.teams.map(function(t){ return { id:t.id, name:t.name, players:Array.isArray(t.players)?t.players:[] }; });
+  if (Array.isArray(d.matches)) f.matches = d.matches.map(function(m){
+    return { round:m.round, home:m.home, away:m.away, hs:m.hs===undefined?null:m.hs, as:m.as===undefined?null:m.as, dayIndex:m.dayIndex, slotPos:m.slotPos, events:Array.isArray(m.events)?m.events:[] };
+  });
+  if (d.drawnAt) f.drawnAt = d.drawnAt;
+  f.playoff = normalizePlayoff(d.playoff);
+  return f;
+}
+
+var state = freshState();
+var slideIndex = 0;
+var slides = [];
+
+function findTeam(teamId){ for (var i=0;i<state.teams.length;i++){ if (state.teams[i].id===teamId) return state.teams[i]; } return null; }
+function teamName(id){ if (id==null) return null; var t=findTeam(id); return t ? t.name : "?"; }
+function playerName(teamId, playerId){ var team=findTeam(teamId); if (!team||!Array.isArray(team.players)) return "?"; for (var i=0;i<team.players.length;i++){ if (team.players[i].id===playerId) return team.players[i].name; } return "?"; }
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+// ---- takvim / gün-tarih eşlemesi (admin.html ile aynı mantık: hafta sonu yok) ----
+function weekdayDates(startISO, count){
+  var dates = [], d = new Date(startISO+"T00:00:00");
+  while (dates.length < count){ var day=d.getDay(); if (day!==0 && day!==6) dates.push(new Date(d)); d=new Date(d); d.setDate(d.getDate()+1); }
+  return dates;
+}
+function dayCount(){ if (!state.matches.length) return 0; var max=0; state.matches.forEach(function(m){ if (m.dayIndex>max) max=m.dayIndex; }); return max+1; }
+function calendar(){ return weekdayDates(state.settings.startDate, dayCount()); }
+function fmtDateShort(d){ return DAYS_TR_SHORT[d.getDay()]+" "+pad2(d.getDate())+"."+pad2(d.getMonth()+1); }
+function isoOf(d){ return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+function timeForSlotPos(pos){ if (pos===0) return state.settings.slot1Time; if (pos===1) return state.settings.slot2Time; return state.settings.slot3Time||"19:00"; }
+
+// ---- istatistikler (admin.html ile aynı) ----
+function computeStandings(){
+  var table = {};
+  state.teams.forEach(function(t){ table[t.id] = {teamId:t.id, name:t.name, played:0, won:0, draw:0, lost:0, gf:0, ga:0}; });
+  state.matches.forEach(function(m){
+    if (m.hs==null || m.as==null) return;
+    var h=table[m.home], a=table[m.away];
+    if (!h||!a) return;
+    h.played++; a.played++; h.gf+=m.hs; h.ga+=m.as; a.gf+=m.as; a.ga+=m.hs;
+    if (m.hs>m.as){ h.won++; a.lost++; } else if (m.hs<m.as){ a.won++; h.lost++; } else { h.draw++; a.draw++; }
+  });
+  var rows = Object.keys(table).map(function(id){ var r=table[id]; r.avg=r.gf-r.ga; r.pts=r.won*3+r.draw; return r; });
+  rows.sort(function(a,b){ return (b.pts-a.pts)||(b.avg-a.avg)||(b.gf-a.gf)||a.name.localeCompare(b.name,"tr"); });
+  return rows;
+}
+function allMatchesWithEvents(){
+  var list = state.matches.slice();
+  var p = state.playoff;
+  if (p && p.active) list = list.concat(p.qf, p.sf, [p.final, p.third]);
+  return list;
+}
+function computeTopScorers(){
+  var tally = {};
+  allMatchesWithEvents().forEach(function(m){
+    (m.events||[]).forEach(function(ev){
+      if (ev.type!=="goal") return;
+      var key = ev.teamId+"|"+ev.playerId;
+      if (!tally[key]) tally[key] = { playerId:ev.playerId, teamId:ev.teamId, name:playerName(ev.teamId,ev.playerId), teamName:teamName(ev.teamId), goals:0 };
+      tally[key].goals++;
+    });
+  });
+  var rows = Object.keys(tally).map(function(k){ return tally[k]; });
+  rows.sort(function(a,b){ return (b.goals-a.goals)||a.name.localeCompare(b.name,"tr"); });
+  return rows;
+}
+function computeCardTotals(){
+  var counts = {};
+  allMatchesWithEvents().forEach(function(m){
+    (m.events||[]).forEach(function(ev){
+      if (ev.type!=="yellow" && ev.type!=="red") return;
+      var key = ev.teamId+"|"+ev.playerId;
+      if (!counts[key]) counts[key] = { playerId:ev.playerId, teamId:ev.teamId, name:playerName(ev.teamId,ev.playerId), teamName:teamName(ev.teamId), sari:0, kirmizi:0 };
+      if (ev.type==="yellow") counts[key].sari++; else counts[key].kirmizi++;
+    });
+  });
+  var arr = Object.keys(counts).map(function(k){ return counts[k]; });
+  arr.sort(function(a,b){ return (b.kirmizi*2+b.sari) - (a.kirmizi*2+a.sari); });
+  return arr;
+}
+// Ceza durumu (sadece lig evresi maçları — admin.html'deki ile aynı kural/kapsam).
+function computeSuspensions(){
+  var suspended = {}, byTeam = {};
+  state.matches.forEach(function(m){ (byTeam[m.home]=byTeam[m.home]||[]).push(m); (byTeam[m.away]=byTeam[m.away]||[]).push(m); });
+  Object.keys(byTeam).forEach(function(teamId){
+    var matches = byTeam[teamId].slice().sort(function(a,b){ return (a.dayIndex-b.dayIndex)||(a.slotPos-b.slotPos); });
+    var yellowAcc={}, banRemaining={};
+    for (var i=0;i<matches.length;i++){
+      var m = matches[i];
+      var played = m.hs!=null && m.as!=null;
+      if (!played){ Object.keys(banRemaining).forEach(function(pid){ if (banRemaining[pid]>0) suspended[pid]=true; }); break; }
+      Object.keys(banRemaining).forEach(function(pid){ if (banRemaining[pid]>0) banRemaining[pid]--; });
+      var yellowsThisMatch = {};
+      (m.events||[]).forEach(function(ev){ if (ev.teamId!==teamId||ev.type!=="yellow") return; yellowsThisMatch[ev.playerId]=(yellowsThisMatch[ev.playerId]||0)+1; });
+      Object.keys(yellowsThisMatch).forEach(function(pid){
+        if (yellowsThisMatch[pid]===1){ yellowAcc[pid]=(yellowAcc[pid]||0)+1; if (yellowAcc[pid]>=2){ banRemaining[pid]=(banRemaining[pid]||0)+1; yellowAcc[pid]-=2; } }
+      });
+      (m.events||[]).forEach(function(ev){ if (ev.teamId!==teamId||ev.type!=="red") return; banRemaining[ev.playerId]=(banRemaining[ev.playerId]||0)+1; });
+    }
+  });
+  return suspended;
+}
+
+// ---- render ----
+function topbarHtml(){
+  var now = new Date();
+  var time = pad2(now.getHours())+":"+pad2(now.getMinutes());
+  var dateStr = DAYS_TR[now.getDay()]+", "+now.getDate()+" "+MONTHS_TR[now.getMonth()];
+  return '' +
+    '<div class="topbar">' +
+      '<div class="brand">' +
+        '<svg class="crest" width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16.5" fill="none" stroke="currentColor" stroke-width="2.4"></circle><circle cx="20" cy="20" r="2.6" fill="currentColor"></circle><line x1="20" y1="2.5" x2="20" y2="9.5" stroke="currentColor" stroke-width="2.4"></line><line x1="20" y1="30.5" x2="20" y2="37.5" stroke="currentColor" stroke-width="2.4"></line></svg>' +
+        '<div><span class="brand-eyebrow">Lig Evresi</span><h1>Turnuva Panosu</h1></div>' +
+      '</div>' +
+      '<div class="clock"><div class="time mono" id="clockTime">' + time + '</div><div class="date">' + dateStr + '</div></div>' +
+    '</div>';
+}
+
+function buildSlides(){
+  var out = [];
+  out.push({ type:"fixtures" });
+  var teamCount = state.teams.length;
+  var pages = Math.max(1, Math.ceil(teamCount / PAGE_SIZE));
+  for (var p=0;p<pages;p++) out.push({ type:"standings", page:p, pages:pages });
+  out.push({ type:"scorers" });
+  if (state.playoff && state.playoff.active) out.push({ type:"playoff" });
+  return out;
+}
+
+function renderFixturesSlide(){
+  if (!state.drawnAt || !state.matches.length){
+    return '<div class="slide"><div class="empty">Fikstür henüz oluşmadı.</div></div>';
+  }
+  var cal = calendar();
+  var todayISO = isoOf(new Date());
+  var withDate = state.matches.map(function(m){ var d = cal[m.dayIndex]; return { m:m, date: d ? isoOf(d) : null, dateObj: d }; });
+
+  var todays = withDate.filter(function(x){ return x.date===todayISO; });
+  var list = todays;
+  var label = "Bugünün Maçları";
+  if (!list.length){
+    var future = withDate.filter(function(x){ return x.date && x.date>todayISO; });
+    future.sort(function(a,b){ return a.date<b.date?-1:1; });
+    if (future.length){
+      var nextDate = future[0].date;
+      list = future.filter(function(x){ return x.date===nextDate; });
+      label = "Sıradaki Maçlar";
+    }
+  }
+  var recent = withDate.filter(function(x){ return x.m.hs!=null && x.m.as!=null; });
+  recent.sort(function(a,b){ return (b.m.dayIndex-a.m.dayIndex)||(b.m.slotPos-a.m.slotPos); });
+  recent = recent.slice(0,4);
+
+  var cards = list.map(function(x){
+    var m = x.m, played = m.hs!=null && m.as!=null;
+    var scoreHtml = played ? (m.hs+" : "+m.as) : "vs";
+    var tag = m.round+". Hafta · "+(x.dateObj?fmtDateShort(x.dateObj):"")+" · "+timeForSlotPos(m.slotPos);
+    return '<div class="match-card"><span class="tag">'+tag+'</span><div class="pair"><span class="t">'+esc(teamName(m.home))+'</span><span class="score">'+scoreHtml+'</span><span class="t">'+esc(teamName(m.away))+'</span></div></div>';
+  }).join('');
+
+  var recentHtml = "";
+  if (recent.length){
+    recentHtml = '<div class="slide-title" style="padding-top:6px"><h2 style="font-size:20px">Son Sonuçlar</h2></div><div class="match-grid">' +
+      recent.map(function(x){
+        var m = x.m;
+        return '<div class="match-card"><span class="tag">'+m.round+'. Hafta · '+(x.dateObj?fmtDateShort(x.dateObj):"")+'</span><div class="pair"><span class="t">'+esc(teamName(m.home))+'</span><span class="score">'+m.hs+' : '+m.as+'</span><span class="t">'+esc(teamName(m.away))+'</span></div></div>';
+      }).join('') + '</div>';
+  }
+
+  if (!list.length && !recent.length){
+    return '<div class="slide"><div class="empty">Lig evresi tamamlandı'+(state.playoff&&state.playoff.active?' — Play-Off sekmesine bakın.':'.')+'</div></div>';
+  }
+  return '<div class="slide">' +
+    '<div class="slide-title"><h2>'+label+'</h2><span class="sub">'+list.length+' maç</span></div>' +
+    '<div class="match-grid">'+(cards||'<div class="empty">Bekleyen maç yok.</div>')+'</div>' +
+    recentHtml +
+    '</div>';
+}
+
+function renderStandingsSlide(slide){
+  var stats = computeStandings();
+  var start = slide.page * PAGE_SIZE;
+  var pageStats = stats.slice(start, start+PAGE_SIZE);
+  var rows = pageStats.map(function(s,i){
+    var rank = start+i+1;
+    return '<tr class="'+(rank<=8?'top8':'')+'"><td class="rank mono">'+rank+'</td><td>'+esc(s.name)+'</td>' +
+      '<td class="num">'+s.played+'</td><td class="num">'+s.won+'</td><td class="num">'+s.draw+'</td><td class="num">'+s.lost+'</td>' +
+      '<td class="num">'+(s.avg>0?'+':'')+s.avg+'</td><td class="num pts">'+s.pts+'</td></tr>';
+  }).join('');
+  return '<div class="slide">' +
+    '<div class="slide-title"><h2>Puan Durumu</h2><span class="sub">'+(slide.pages>1?('Sayfa '+(slide.page+1)+'/'+slide.pages+' · '):'')+'İlk 8 play-off\'a yükselir</span></div>' +
+    '<table class="standings-table"><thead><tr><th>#</th><th>Takım</th><th class="num">O</th><th class="num">G</th><th class="num">B</th><th class="num">M</th><th class="num">Av</th><th class="num">Puan</th></tr></thead><tbody>'+(rows||'')+'</tbody></table>' +
+    '</div>';
+}
+
+function renderScorersSlide(){
+  var top5 = computeTopScorers().slice(0,5);
+  var cards = computeCardTotals().slice(0,8);
+  var suspended = computeSuspensions();
+  var scorersHtml = top5.length ? top5.map(function(s,i){
+    return '<div class="scorer-row"><span class="rank mono">'+(i+1)+'</span><span>'+esc(s.name)+'</span><span class="mono" style="color:var(--ink-muted);font-size:15px">'+esc(s.teamName)+'</span><span class="n">'+s.goals+'</span></div>';
+  }).join('') : '<div class="empty" style="height:auto;padding:30px 0">Henüz gol kaydedilmedi.</div>';
+  var cardsHtml = cards.length ? cards.map(function(c){
+    var susp = suspended[c.playerId] ? '<span class="susp-tag">Cezalı</span>' : '';
+    var parts = [];
+    if (c.sari) parts.push(c.sari+' sarı');
+    if (c.kirmizi) parts.push(c.kirmizi+' kırmızı');
+    return '<div class="card-row"><span>'+(c.kirmizi>0?"🟥":"🟨")+'</span><span>'+esc(c.name)+'</span><span class="mono" style="color:var(--ink-muted);font-size:14px">'+esc(c.teamName)+(parts.length?(' · '+parts.join(' · ')):'')+'</span>'+susp+'</div>';
+  }).join('') : '<div class="empty" style="height:auto;padding:30px 0">Henüz kart yok.</div>';
+  return '<div class="slide">' +
+    '<div class="slide-title"><h2>Gol Krallığı &amp; Kartlar</h2></div>' +
+    '<div class="two-col"><div class="box"><h3>İlk 5 Gol Kralı</h3>'+scorersHtml+'</div><div class="box"><h3>Kartlar</h3>'+cardsHtml+'</div></div>' +
+    '</div>';
+}
+
+function renderPlayoffSlide(){
+  var p = state.playoff;
+  if (!p || !p.active){
+    return '<div class="slide"><div class="empty">Play-Off henüz aktif değil.</div></div>';
+  }
+  function seedLabel(n){ return n+". Sıra"; }
+  function labelFor(teamId, fallback){ return teamId!=null ? teamName(teamId) : fallback; }
+  function kocard(m, homeLabel, awayLabel, extraClass){
+    var known = !!(m && m.home!=null && m.away!=null);
+    var played = known && m.hs!=null && m.as!=null;
+    var winner = played ? (m.hs>m.as?m.home:(m.as>m.hs?m.away:null)) : null;
+    function row(teamId, label){
+      if (teamId==null) return '<div class="ko-team tbd">'+esc(label)+'</div>';
+      return '<div class="ko-team'+(teamId===winner?' winner':'')+'">'+esc(label)+'</div>';
+    }
+    var score = played ? ('<div class="ko-score">'+m.hs+' : '+m.as+'</div>') : '';
+    return '<div class="ko-card'+(extraClass?(' '+extraClass):'')+'">'+row(known?m.home:null,homeLabel)+row(known?m.away:null,awayLabel)+score+'</div>';
+  }
+  var qfPairs = [[1,8],[4,5],[2,7],[3,6]];
+  var qfHtml = qfPairs.map(function(pair,i){
+    var m = p.qf[i];
+    return kocard(m, labelFor(m.home, seedLabel(pair[0])), labelFor(m.away, seedLabel(pair[1])));
+  }).join('');
+  var sfFallbacks = [["1. Çeyrek Final galibi","2. Çeyrek Final galibi"],["3. Çeyrek Final galibi","4. Çeyrek Final galibi"]];
+  var sfHtml = [0,1].map(function(i){
+    var m = p.sf[i];
+    return kocard(m, labelFor(m.home, sfFallbacks[i][0]), labelFor(m.away, sfFallbacks[i][1]));
+  }).join('');
+  var finalHtml = kocard(p.final, labelFor(p.final.home,"1. Yarı Final galibi"), labelFor(p.final.away,"2. Yarı Final galibi"), "ko-final");
+  var thirdHtml = kocard(p.third, labelFor(p.third.home,"1. Yarı Final kaybedeni"), labelFor(p.third.away,"2. Yarı Final kaybedeni"));
+  return '<div class="slide">' +
+    '<div class="slide-title"><h2>Play-Off</h2></div>' +
+    '<div class="ko-cols">' +
+      '<div class="ko-col"><h3>Çeyrek Final</h3>'+qfHtml+'</div>' +
+      '<div class="ko-col"><h3>Yarı Final</h3>'+sfHtml+'</div>' +
+      '<div class="ko-col"><h3>Final</h3>'+finalHtml+'</div>' +
+      '<div class="ko-col"><h3>3.lük Maçı</h3>'+thirdHtml+'</div>' +
+    '</div>' +
+    '</div>';
+}
+
+function renderSlide(s){
+  if (s.type==="fixtures") return renderFixturesSlide();
+  if (s.type==="standings") return renderStandingsSlide(s);
+  if (s.type==="scorers") return renderScorersSlide();
+  if (s.type==="playoff") return renderPlayoffSlide();
+  return "";
+}
+
+function renderDots(){
+  var out = "";
+  for (var i=0;i<slides.length;i++) out += '<span class="dot'+(i===slideIndex?' active':'')+'"></span>';
+  return '<div class="dots">'+out+'</div>';
+}
+
+function render(){
+  slides = buildSlides();
+  if (slideIndex >= slides.length) slideIndex = 0;
+  var html = '<div class="wrap">' + topbarHtml() + renderSlide(slides[slideIndex]) + renderDots() + '</div>';
+  document.getElementById("root").innerHTML = html;
+}
+
+function tickClock(){
+  var el = document.getElementById("clockTime");
+  if (el){
+    var now = new Date();
+    el.textContent = pad2(now.getHours())+":"+pad2(now.getMinutes());
+  }
+}
+
+// ---- data loading (plain XHR, no external deps — tek satır: turnuva_state) ----
+function restGet(cfg, path, cb){
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", cfg.url.replace(/\/$/,"") + "/rest/v1/" + path, true);
+  xhr.setRequestHeader("apikey", cfg.key);
+  xhr.setRequestHeader("Authorization", "Bearer " + cfg.key);
+  xhr.onreadystatechange = function(){
+    if (xhr.readyState===4){
+      if (xhr.status>=200 && xhr.status<300){
+        var data = null;
+        try{ data = JSON.parse(xhr.responseText); }catch(e){}
+        cb(null, data||[]);
+      } else {
+        cb(new Error("HTTP "+xhr.status));
+      }
+    }
+  };
+  xhr.send();
+}
+function loadAll(){
+  var cfg = getConfig();
+  if (!cfg.url || !cfg.key) return;
+  restGet(cfg, "turnuva_state?select=data&id=eq.main", function(err,data){
+    if (err) return;
+    var row = data && data[0];
+    state = normalizeState(row ? row.data : null);
+    render();
+  });
+}
+
+function renderSetup(){
+  document.getElementById("root").innerHTML =
+    '<div class="setup">' +
+    '<h2 style="font-size:22px;margin-bottom:14px">Turnuva Panosu Kurulumu</h2>' +
+    '<p style="color:var(--ink-muted);font-size:15px;line-height:1.6">Supabase Project URL ve anon public key gerekli. En kolay yol: bu sayfayı <span class="mono">?url=...&key=...</span> parametreleriyle açmak (PlatPlay web oynatıcı adresine tek seferlik yazılır). Klavyeniz varsa aşağıdan da girebilirsiniz.</p>' +
+    '<label style="font-size:13px;color:var(--ink-muted)">Project URL</label><input id="setupUrl" placeholder="https://xxxxx.supabase.co">' +
+    '<label style="font-size:13px;color:var(--ink-muted)">Anon public key</label><input id="setupKey" placeholder="eyJhbGciOi...">' +
+    '<button id="setupSave">Kaydet</button>' +
+    '</div>';
+  document.getElementById("setupSave").addEventListener("click", function(){
+    var u = document.getElementById("setupUrl").value.trim();
+    var k = document.getElementById("setupKey").value.trim();
+    if (!u || !k) return;
+    setConfig(u,k);
+    boot();
+  });
+}
+
+function boot(){
+  var cfg = getConfig();
+  if (!cfg.url || !cfg.key){ renderSetup(); return; }
+  loadAll();
+  setInterval(loadAll, POLL_MS);
+  setInterval(tickClock, 30000);
+  setInterval(function(){
+    slideIndex = (slideIndex+1) % Math.max(1, slides.length);
+    render();
+  }, SLIDE_MS);
+}
+
+boot();
+})();
+</script>
+</body>
+</html>

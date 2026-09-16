@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BETEK Cup — Kaptan Görünümü</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+  :root{
+    --bg:#F6F7F2; --surface:#FFFFFF; --surface-2:#EDF1E7; --ink:#14211B; --ink-muted:#4B5850;
+    --border:#D7DECC; --accent:#1E6B45; --accent-strong:#124D31; --accent-ink:#FFFFFF;
+    --brick:#B14B34; --shadow:0 1px 2px rgba(18,32,20,.06),0 6px 16px rgba(18,32,20,.05);
+    --font-display:'Oswald','Arial Narrow',sans-serif;
+    --font-body:'IBM Plex Sans',-apple-system,'Segoe UI',sans-serif; --font-mono:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0E1712; --surface:#16211B; --surface-2:#1D2A22; --ink:#EFF3EA; --ink-muted:#9BAA9C;
+      --border:#2B3A30; --accent:#4CAE7C; --accent-strong:#6FC896; --accent-ink:#0E1712; --brick:#E07A5F;
+      --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 20px rgba(0,0,0,.35); }
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-body); font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased; }
+  h1,h2,h3{ font-family:var(--font-display); font-weight:600; margin:0; letter-spacing:.2px; }
+  .mono{ font-family:var(--font-mono); }
+  select{ font-family:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:7px 9px; font-size:14px; }
+  select:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+
+  .topbar{ position:sticky; top:0; z-index:10; background:var(--surface); border-bottom:1px solid var(--border); padding-top:env(safe-area-inset-top,0px); }
+  .topbar-inner{ max-width:860px; margin:0 auto; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .brand{ display:flex; align-items:center; gap:9px; color:var(--accent); }
+  .brand-text{ display:flex; flex-direction:column; gap:1px; }
+  .brand-eyebrow{ font-family:var(--font-mono); font-size:9.5px; letter-spacing:1.3px; color:var(--ink-muted); text-transform:uppercase; }
+  .brand-text h1{ font-size:17px; color:var(--ink); }
+  .status-dot{ width:8px; height:8px; border-radius:50%; background:var(--brick); flex:none; }
+  .status-dot.ok{ background:var(--accent); }
+  .tabs{ display:flex; gap:3px; overflow-x:auto; -webkit-overflow-scrolling:touch; background:var(--surface-2); padding:4px; border-radius:8px; max-width:860px; margin:0 auto; }
+  .tab-btn{ border:none; background:transparent; color:var(--ink-muted); padding:8px 12px; border-radius:6px; font-size:11.5px; font-weight:600; cursor:pointer; font-family:var(--font-display); letter-spacing:.3px; text-transform:uppercase; white-space:nowrap; flex:none; }
+  .tab-btn.active{ background:var(--accent); color:var(--accent-ink); }
+
+  .content{ max-width:860px; margin:0 auto; padding:18px 16px 48px; }
+  .stage{ display:flex; flex-direction:column; gap:16px; }
+  .section-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .section-head h2{ font-size:17px; }
+  .section-sub{ color:var(--ink-muted); font-size:12.5px; }
+  .panel{ background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px 16px; box-shadow:var(--shadow); }
+  .note{ font-size:13px; color:var(--ink-muted); line-height:1.55; }
+
+  .ozet-picker select{ font-size:14px; flex:1; min-width:160px; }
+  .ozet-picker{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
+  .day-group{ display:flex; flex-direction:column; gap:7px; }
+  .day-head{ display:flex; align-items:baseline; gap:8px; padding-top:4px; }
+  .day-head .d1{ font-family:var(--font-display); font-size:13px; }
+  .day-head .d2{ font-family:var(--font-mono); font-size:10.5px; color:var(--ink-muted); }
+  .match-row{ display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:7px; padding:8px 10px; }
+  .tag{ font-family:var(--font-mono); font-size:9.5px; color:var(--ink-muted); background:var(--surface-2); border-radius:4px; padding:2px 6px; flex:none; }
+  .tag.time{ background:var(--surface); border:1px solid var(--border); }
+  .match-row .side{ flex:1; min-width:0; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .match-row .side.home{ text-align:right; }
+  .match-row .score-static{ font-family:var(--font-mono); font-weight:600; color:var(--accent-strong); flex:none; min-width:36px; text-align:center; }
+  .match-row.pending{ opacity:.85; }
+  .match-row.mine{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+
+  .standings-table{ width:100%; border-collapse:collapse; font-size:12px; }
+  .standings-table th{ font-family:var(--font-mono); font-size:9.5px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.5px; text-align:center; padding:6px 6px; border-bottom:2px solid var(--border); white-space:nowrap; }
+  .standings-table th:nth-child(2){ text-align:left; }
+  .standings-table td{ padding:7px 6px; text-align:center; border-bottom:1px solid var(--border); }
+  .standings-table td.team-cell{ text-align:left; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; }
+  .standings-table td.pts{ font-family:var(--font-mono); font-weight:700; color:var(--accent-strong); }
+  .standings-table tr.po-qualify td.team-cell{ box-shadow:inset 3px 0 0 var(--accent); padding-left:8px; }
+  .standings-table tr.po-divider td{ padding:4px 6px; border-bottom:1px solid var(--border); }
+  .po-divider-line{ display:flex; align-items:center; gap:8px; font-family:var(--font-mono); font-size:9px; color:var(--accent-strong); text-transform:uppercase; letter-spacing:.5px; }
+  .po-divider-line::before,.po-divider-line::after{ content:""; flex:1; height:1px; background:var(--accent); opacity:.4; }
+
+  .leader-row{ display:flex; align-items:center; gap:9px; background:var(--surface); border:1px solid var(--border); border-radius:7px; padding:8px 10px; font-size:12.5px; }
+  .leader-rank{ font-family:var(--font-mono); color:var(--ink-muted); flex:none; width:16px; text-align:center; }
+  .leader-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+  .leader-team{ color:var(--ink-muted); font-size:11.5px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .leader-count{ font-family:var(--font-mono); font-weight:700; flex:none; min-width:20px; text-align:center; }
+  .susp-badge{ font-family:var(--font-mono); font-size:9px; color:var(--brick); border:1px solid var(--brick); border-radius:4px; padding:3px 5px; flex:none; white-space:nowrap; }
+  .card-icon{ display:inline-block; width:9px; height:13px; border-radius:2px; vertical-align:-2px; }
+  .card-icon-yellow{ background:#E8B923; }
+  .card-icon-red{ background:#C4402C; }
+
+  .po-bracket{ display:flex; flex-direction:column; gap:16px; }
+  .po-round-label{ font-family:var(--font-mono); font-size:9.5px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+  .po-round{ display:flex; flex-direction:column; gap:6px; }
+  .po-match{ display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:7px; padding:8px 10px; }
+  .po-match .side{ flex:1; min-width:0; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .po-match .side.home{ text-align:right; }
+  .po-match .side.tbd{ color:var(--ink-muted); font-style:italic; }
+  .po-final{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .po-third-label{ font-size:11px; color:var(--ink-muted); margin-bottom:4px; }
+
+  .empty-state{ padding:30px 10px; text-align:center; color:var(--ink-muted); font-size:13.5px; }
+
+  .setup{ max-width:420px; margin:60px auto; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:24px; box-shadow:var(--shadow); }
+  .setup input{ width:100%; margin-top:6px; margin-bottom:14px; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--ink); font-family:inherit; font-size:14px; }
+  .setup button{ background:var(--accent); color:var(--accent-ink); border:none; padding:10px 18px; border-radius:7px; font-family:var(--font-display); text-transform:uppercase; letter-spacing:.3px; font-weight:600; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div id="app">
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <svg width="24" height="24" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16.5" fill="none" stroke="currentColor" stroke-width="2.4"></circle><circle cx="20" cy="20" r="2.6" fill="currentColor"></circle><line x1="20" y1="2.5" x2="20" y2="9.5" stroke="currentColor" stroke-width="2.4"></line><line x1="20" y1="30.5" x2="20" y2="37.5" stroke="currentColor" stroke-width="2.4"></line></svg>
+      <div class="brand-text">
+        <span class="brand-eyebrow">Lig Evresi</span>
+        <h1>Kaptan Görünümü</h1>
+      </div>
+    </div>
+    <span class="status-dot" id="statusDot" title="Bağlantı durumu"></span>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button class="tab-btn" data-tab="ozet">Özet</button>
+    <button class="tab-btn" data-tab="fikstur">Fikstür</button>
+    <button class="tab-btn" data-tab="puan">Puan Durumu</button>
+    <button class="tab-btn" data-tab="playoff">Play-Off</button>
+    <button class="tab-btn" data-tab="krallik">Gol Krallığı</button>
+    <button class="tab-btn" data-tab="kartlar">Kartlar</button>
+  </nav>
+</header>
+<main class="content" id="content"></main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ==========================================================================
+  // Kaptan Görünümü — herkese açık, salt-okunur, sekmeli, telefon dostu sayfa.
+  // admin.html ile AYNI Supabase turnuva_state satırını okur ama hiçbir yazma
+  // işlemi yapmaz, PIN istemez — kaptanlara gönderilecek link budur. Hesaplama
+  // fonksiyonları admin.html'den birebir taşındı.
+  // ==========================================================================
+
+  var DAYS_TR = ["Pazar","Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi"];
+  var DAYS_TR_SHORT = ["Paz","Pzt","Sal","Çar","Per","Cum","Cmt"];
+  var MONTHS_TR = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+  var DEFAULT_START_DATE = "2026-10-05";
+
+  function freshState(){
+    return {
+      settings:{ startDate:DEFAULT_START_DATE, slot1Time:"17:00", slot2Time:"18:00", slot3Time:"19:00", matchesPerDay:2, rounds:4 },
+      teams:[], matches:[], drawnAt:null, playoff:null
+    };
+  }
+  function normalizePlayoffMatch(m){
+    if (!m) return { home:null, away:null, hs:null, as:null, events:[] };
+    return { home:m.home===undefined?null:m.home, away:m.away===undefined?null:m.away, hs:m.hs===undefined?null:m.hs, as:m.as===undefined?null:m.as, events:Array.isArray(m.events)?m.events:[] };
+  }
+  function normalizePlayoff(d){
+    if (!d || !d.active) return null;
+    return {
+      active:true, seeds:Array.isArray(d.seeds)?d.seeds:[],
+      qf:Array.isArray(d.qf)?d.qf.map(normalizePlayoffMatch):[],
+      sf:Array.isArray(d.sf)?d.sf.map(function(s,i){ var nm=normalizePlayoffMatch(s); nm.fromQF=Array.isArray(s&&s.fromQF)?s.fromQF:[i*2,i*2+1]; return nm; }):[],
+      final:normalizePlayoffMatch(d.final), third:normalizePlayoffMatch(d.third)
+    };
+  }
+  function normalizeState(d){
+    var f = freshState();
+    if (!d) return f;
+    if (d.settings){
+      if (d.settings.startDate) f.settings.startDate = d.settings.startDate;
+      if (d.settings.slot1Time) f.settings.slot1Time = d.settings.slot1Time;
+      if (d.settings.slot2Time) f.settings.slot2Time = d.settings.slot2Time;
+      if (d.settings.slot3Time) f.settings.slot3Time = d.settings.slot3Time;
+      f.settings.matchesPerDay = (d.settings.matchesPerDay===3) ? 3 : 2;
+      if (d.settings.rounds) f.settings.rounds = d.settings.rounds;
+    }
+    if (Array.isArray(d.teams)) f.teams = d.teams.map(function(t){ return { id:t.id, name:t.name, players:Array.isArray(t.players)?t.players:[] }; });
+    if (Array.isArray(d.matches)) f.matches = d.matches.map(function(m){
+      return { round:m.round, home:m.home, away:m.away, hs:m.hs===undefined?null:m.hs, as:m.as===undefined?null:m.as, dayIndex:m.dayIndex, slotPos:m.slotPos, events:Array.isArray(m.events)?m.events:[] };
+    });
+    if (d.drawnAt) f.drawnAt = d.drawnAt;
+    f.playoff = normalizePlayoff(d.playoff);
+    return f;
+  }
+
+  function weekdayDates(startISO, count){
+    var dates = [], d = new Date(startISO+"T00:00:00");
+    while (dates.length < count){ var day=d.getDay(); if (day!==0 && day!==6) dates.push(new Date(d)); d=new Date(d); d.setDate(d.getDate()+1); }
+    return dates;
+  }
+  function fmtDateLong(d){ return DAYS_TR[d.getDay()]+", "+d.getDate()+" "+MONTHS_TR[d.getMonth()]+" "+d.getFullYear(); }
+  function fmtDateShort(d){ return DAYS_TR_SHORT[d.getDay()]+" "+String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear(); }
+  function timeForSlotPos(state, pos){ if (pos===0) return state.settings.slot1Time; if (pos===1) return state.settings.slot2Time; return state.settings.slot3Time||"19:00"; }
+  function dayCount(state){ if (!state.matches.length) return 0; var max=0; state.matches.forEach(function(m){ if (m.dayIndex>max) max=m.dayIndex; }); return max+1; }
+  function calendar(state){ return weekdayDates(state.settings.startDate, dayCount(state)); }
+  function findTeam(state, teamId){ for (var i=0;i<state.teams.length;i++){ if (state.teams[i].id===teamId) return state.teams[i]; } return null; }
+  function teamName(state, id){ if (id==null) return null; var t=findTeam(state,id); return t?t.name:"?"; }
+  function playerName(state, teamId, playerId){ var team=findTeam(state,teamId); if (!team||!Array.isArray(team.players)) return "?"; for (var i=0;i<team.players.length;i++){ if (team.players[i].id===playerId) return team.players[i].name; } return "?"; }
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+  // BETEK Cup Supabase projesi — varsayılan bağlantı bilgisi, link hiçbir
+  // parametre/localStorage olmadan açılsa bile otomatik bağlansın diye.
+  var DEFAULT_SUPABASE_URL = "https://arjecfiigkebkeccfpxi.supabase.co";
+  var DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyamVjZmlpZ2tlYmtlY2NmcHhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NDg5NzEsImV4cCI6MjEwNTEyNDk3MX0.YhcLALmCr8IQjTuBZTkJKSjIW8TlXpT6oOzPcgAc2k8";
+
+  // ---- config: URL params (?url=&key=) win, then localStorage, then the default above ----
+  function readParam(name){
+    var m = new RegExp("[?&]"+name+"=([^&]+)").exec(window.location.search);
+    return m ? decodeURIComponent(m[1].replace(/\+/g," ")) : null;
+  }
+  function getConfig(){
+    var url = readParam("url"), key = readParam("key");
+    if (url && key){ try{ localStorage.setItem("turnuva_supabase_url",url); localStorage.setItem("turnuva_supabase_key",key); }catch(e){} return {url:url,key:key}; }
+    try{ return { url: localStorage.getItem("turnuva_supabase_url")||DEFAULT_SUPABASE_URL, key: localStorage.getItem("turnuva_supabase_key")||DEFAULT_SUPABASE_KEY }; }catch(e){ return {url:DEFAULT_SUPABASE_URL,key:DEFAULT_SUPABASE_KEY}; }
+  }
+  function setConfig(url,key){ try{ localStorage.setItem("turnuva_supabase_url",url); localStorage.setItem("turnuva_supabase_key",key); }catch(e){} }
+
+  var state = freshState();
+  var uiTab = "ozet";
+  var uiState = { selectedTeamId:null };
+  var supabaseClient = null;
+
+  // ---- istatistikler (admin.html ile birebir aynı) ----
+  function computeStandings(state){
+    var table = {};
+    state.teams.forEach(function(t){ table[t.id] = {teamId:t.id, name:t.name, played:0, won:0, draw:0, lost:0, gf:0, ga:0}; });
+    state.matches.forEach(function(m){
+      if (m.hs==null || m.as==null) return;
+      var h=table[m.home], a=table[m.away];
+      if (!h||!a) return;
+      h.played++; a.played++; h.gf+=m.hs; h.ga+=m.as; a.gf+=m.as; a.ga+=m.hs;
+      if (m.hs>m.as){ h.won++; a.lost++; } else if (m.hs<m.as){ a.won++; h.lost++; } else { h.draw++; a.draw++; }
+    });
+    var rows = Object.keys(table).map(function(id){ var r=table[id]; r.avg=r.gf-r.ga; r.pts=r.won*3+r.draw; return r; });
+    rows.sort(function(a,b){ return (b.pts-a.pts)||(b.avg-a.avg)||(b.gf-a.gf)||a.name.localeCompare(b.name,"tr"); });
+    return rows;
+  }
+  function allMatchesWithEvents(state){
+    var list = state.matches.slice();
+    var p = state.playoff;
+    if (p && p.active) list = list.concat(p.qf, p.sf, [p.final, p.third]);
+    return list;
+  }
+  function computeTopScorers(state){
+    var tally = {};
+    allMatchesWithEvents(state).forEach(function(m){
+      (m.events||[]).forEach(function(ev){
+        if (ev.type!=="goal") return;
+        var key = ev.teamId+"|"+ev.playerId;
+        if (!tally[key]) tally[key] = { playerId:ev.playerId, teamId:ev.teamId, name:playerName(state,ev.teamId,ev.playerId), teamName:teamName(state,ev.teamId), goals:0 };
+        tally[key].goals++;
+      });
+    });
+    var rows = Object.keys(tally).map(function(k){ return tally[k]; });
+    rows.sort(function(a,b){ return (b.goals-a.goals)||a.name.localeCompare(b.name,"tr"); });
+    return rows;
+  }
+  function computeCardTotals(state){
+    var yellow={}, red={};
+    allMatchesWithEvents(state).forEach(function(m){
+      (m.events||[]).forEach(function(ev){
+        if (ev.type!=="yellow" && ev.type!=="red") return;
+        var bucket = ev.type==="yellow"?yellow:red;
+        var key = ev.teamId+"|"+ev.playerId;
+        if (!bucket[key]) bucket[key] = { playerId:ev.playerId, teamId:ev.teamId, name:playerName(state,ev.teamId,ev.playerId), teamName:teamName(state,ev.teamId), count:0 };
+        bucket[key].count++;
+      });
+    });
+    function toSorted(bucket){ var rows=Object.keys(bucket).map(function(k){ return bucket[k]; }); rows.sort(function(a,b){ return (b.count-a.count)||a.name.localeCompare(b.name,"tr"); }); return rows; }
+    return { yellow: toSorted(yellow), red: toSorted(red) };
+  }
+  function computeSuspensions(state){
+    var suspended = {}, byTeam = {};
+    state.matches.forEach(function(m){ (byTeam[m.home]=byTeam[m.home]||[]).push(m); (byTeam[m.away]=byTeam[m.away]||[]).push(m); });
+    Object.keys(byTeam).forEach(function(teamId){
+      var matches = byTeam[teamId].slice().sort(function(a,b){ return (a.dayIndex-b.dayIndex)||(a.slotPos-b.slotPos); });
+      var yellowAcc={}, banRemaining={};
+      for (var i=0;i<matches.length;i++){
+        var m = matches[i];
+        var played = m.hs!=null && m.as!=null;
+        if (!played){ Object.keys(banRemaining).forEach(function(pid){ if (banRemaining[pid]>0) suspended[pid]=true; }); break; }
+        Object.keys(banRemaining).forEach(function(pid){ if (banRemaining[pid]>0) banRemaining[pid]--; });
+        var yellowsThisMatch = {};
+        (m.events||[]).forEach(function(ev){ if (ev.teamId!==teamId||ev.type!=="yellow") return; yellowsThisMatch[ev.playerId]=(yellowsThisMatch[ev.playerId]||0)+1; });
+        Object.keys(yellowsThisMatch).forEach(function(pid){
+          if (yellowsThisMatch[pid]===1){ yellowAcc[pid]=(yellowAcc[pid]||0)+1; if (yellowAcc[pid]>=2){ banRemaining[pid]=(banRemaining[pid]||0)+1; yellowAcc[pid]-=2; } }
+        });
+        (m.events||[]).forEach(function(ev){ if (ev.teamId!==teamId||ev.type!=="red") return; banRemaining[ev.playerId]=(banRemaining[ev.playerId]||0)+1; });
+      }
+    });
+    return suspended;
+  }
+
+  // ---- connection (read-only: select + realtime subscribe, never write) ----
+  function connect(){
+    var cfg = getConfig();
+    if (!cfg.url || !cfg.key){ renderSetup(); return; }
+    try{
+      supabaseClient = supabase.createClient(cfg.url, cfg.key);
+      supabaseClient.from("turnuva_state").select("data").eq("id","main").maybeSingle().then(function(r){
+        if (r.error) throw r.error;
+        state = r.data && r.data.data ? normalizeState(r.data.data) : freshState();
+        document.getElementById("statusDot").classList.add("ok");
+        renderApp();
+        supabaseClient.channel("turnuva_state_changes")
+          .on("postgres_changes", { event:"UPDATE", schema:"public", table:"turnuva_state", filter:"id=eq.main" }, function(payload){
+            state = normalizeState(payload.new && payload.new.data);
+            render();
+          })
+          .subscribe();
+      }).catch(function(e){
+        document.getElementById("statusDot").classList.remove("ok");
+      });
+    }catch(e){
+      document.getElementById("statusDot").classList.remove("ok");
+    }
+  }
+
+  function renderSetup(){
+    document.getElementById("app").innerHTML =
+      '<div class="setup">' +
+      '<h2 style="font-size:18px;margin-bottom:12px">Kaptan Görünümü Kurulumu</h2>' +
+      '<p class="note">Bu link Supabase bağlantı bilgisiyle birlikte gönderilir (<span class="mono">?url=...&key=...</span>). Elle giriyorsanız Project URL ve anon public key\'i aşağıya yazın.</p>' +
+      '<label style="font-size:12.5px;color:var(--ink-muted)">Project URL</label><input id="setupUrl" placeholder="https://xxxxx.supabase.co">' +
+      '<label style="font-size:12.5px;color:var(--ink-muted)">Anon public key</label><input id="setupKey" placeholder="eyJhbGciOi...">' +
+      '<button id="setupSave">Kaydet</button>' +
+      '</div>';
+    document.getElementById("setupSave").addEventListener("click", function(){
+      var u = document.getElementById("setupUrl").value.trim();
+      var k = document.getElementById("setupKey").value.trim();
+      if (!u || !k) return;
+      setConfig(u,k);
+      location.reload();
+    });
+  }
+
+  function renderApp(){
+    // Reaching here means the static shell (tabs/content, present in the initial HTML)
+    // is still intact — connect() only calls renderSetup() (which replaces #app and
+    // then reloads the page on save) when config is missing, so there is nothing to
+    // rebuild here; just draw the current tab.
+    render();
+  }
+
+  // ---- render ----
+  function renderSummaryStrip(state){
+    var days = dayCount(state);
+    var cal = calendar(state);
+    var played = state.matches.filter(function(m){ return m.hs!=null && m.as!=null; }).length;
+    return '<div class="panel" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:12px">' +
+      '<div><div style="font-family:var(--font-display);font-size:18px">'+state.teams.length+'</div><div class="note">Takım</div></div>' +
+      '<div><div style="font-family:var(--font-display);font-size:18px">'+(state.drawnAt?state.matches.length:'—')+'</div><div class="note">Toplam maç</div></div>' +
+      '<div><div style="font-family:var(--font-display);font-size:18px">'+(state.drawnAt?(played+'/'+state.matches.length):'—')+'</div><div class="note">Oynanan</div></div>' +
+      '<div><div style="font-family:var(--font-display);font-size:18px">'+(state.drawnAt?days:'—')+'</div><div class="note">Maç günü</div></div>' +
+    '</div>';
+  }
+
+  function renderOzet(state){
+    if (!state.drawnAt) return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel empty-state">Kura henüz çekilmedi.</div></div>';
+    var teams = state.teams.slice().sort(function(a,b){ return a.name.localeCompare(b.name,"tr"); });
+    if (uiState.selectedTeamId==null || !teams.some(function(t){ return t.id===uiState.selectedTeamId; })) uiState.selectedTeamId = teams.length?teams[0].id:null;
+    var options = teams.map(function(t){ return '<option value="'+esc(t.id)+'"'+(t.id===uiState.selectedTeamId?' selected':'')+'>'+esc(t.name)+'</option>'; }).join('');
+    var picker = '<div class="panel"><div class="section-head"><h2>Takımım</h2></div><div class="ozet-picker" style="margin-top:10px"><select id="ozetTeamSelect">'+options+'</select></div></div>';
+    var body = '';
+    if (uiState.selectedTeamId){
+      var selId = uiState.selectedTeamId, cal = calendar(state);
+      var rows = state.matches.filter(function(m){ return m.home===selId||m.away===selId; }).slice()
+        .sort(function(a,b){ return (a.dayIndex-b.dayIndex)||(a.slotPos-b.slotPos); }).map(function(m){
+          var isHome = m.home===selId, oppId = isHome?m.away:m.home, date = cal[m.dayIndex], played = m.hs!=null&&m.as!=null;
+          var scorePart = played ? ('<span class="score-static">'+(isHome?m.hs:m.as)+' : '+(isHome?m.as:m.hs)+'</span>') : '<span class="score-static">vs</span>';
+          return '<div class="match-row"><span class="tag">'+m.round+'. HAFTA</span><span class="tag time mono">'+fmtDateShort(date)+'</span><span class="tag time mono">'+timeForSlotPos(state,m.slotPos)+'</span><span class="side">'+esc(teamName(state,oppId))+'</span>'+scorePart+'</div>';
+        }).join('');
+      body = '<div class="panel"><div class="section-head"><h2>'+esc(teamName(state,selId))+'</h2></div><div class="stage" style="margin-top:12px;gap:8px">'+(rows||'<span class="note">Maç bulunamadı.</span>')+'</div></div>';
+    }
+    return '<div class="stage">'+renderSummaryStrip(state)+picker+body+'</div>';
+  }
+
+  function renderFikstur(state){
+    if (!state.drawnAt) return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel empty-state">Fikstür henüz oluşmadı.</div></div>';
+    var cal = calendar(state);
+    var groups = {};
+    state.matches.forEach(function(m,idx){ (groups[m.dayIndex]=groups[m.dayIndex]||[]).push(m); });
+    var html = "";
+    for (var di=0; di<cal.length; di++){
+      var date = cal[di];
+      if (!groups[di]) continue;
+      var rows = groups[di].map(function(m){
+        var played = m.hs!=null && m.as!=null;
+        var scorePart = '<span class="score-static">'+(played?(m.hs+' : '+m.as):'vs')+'</span>';
+        return '<div class="match-row '+(played?'':'pending')+'"><span class="tag">'+m.round+'. HAFTA</span><span class="tag time mono">'+timeForSlotPos(state,m.slotPos)+'</span><span class="side home">'+esc(teamName(state,m.home))+'</span>'+scorePart+'<span class="side">'+esc(teamName(state,m.away))+'</span></div>';
+      }).join('');
+      html += '<div class="day-group"><div class="day-head"><span class="d1">'+DAYS_TR[date.getDay()]+'</span><span class="d2">'+fmtDateShort(date)+'</span></div>'+rows+'</div>';
+    }
+    return '<div class="stage">'+renderSummaryStrip(state)+'<div class="stage" style="margin-top:2px">'+html+'</div></div>';
+  }
+
+  function renderPuanDurumu(state){
+    if (!state.drawnAt) return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel empty-state">Puan durumu, kura çekildikten sonra burada görünecek.</div></div>';
+    var rows = computeStandings(state);
+    var body = rows.map(function(r,i){
+      var divider = (i===8 && rows.length>8) ? '<tr class="po-divider"><td colspan="9"><span class="po-divider-line">Playoff hattı</span></td></tr>' : '';
+      return divider + '<tr'+(i<8?' class="po-qualify"':'')+'><td>'+(i+1)+'</td><td class="team-cell">'+esc(r.name)+'</td><td>'+r.played+'</td><td>'+r.won+'</td><td>'+r.draw+'</td><td>'+r.lost+'</td><td>'+(r.avg>0?'+':'')+r.avg+'</td><td class="pts">'+r.pts+'</td></tr>';
+    }).join('');
+    var table = '<div class="panel" style="overflow-x:auto"><table class="standings-table"><thead><tr><th></th><th>Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>AV</th><th>P</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+    return '<div class="stage">'+renderSummaryStrip(state)+table+'</div>';
+  }
+
+  function renderPlayoffMatchRow(state, m, homeLabel, awayLabel, extraClass){
+    var known = !!(m && m.home!=null && m.away!=null);
+    var played = known && m.hs!=null && m.as!=null;
+    var scorePart = '<span class="score-static">'+(played?(m.hs+' : '+m.as):(known?'vs':'—'))+'</span>';
+    return '<div class="po-match'+(known?'':' pending')+(extraClass?(' '+extraClass):'')+'"><span class="side home'+(known?'':' tbd')+'">'+esc(homeLabel)+'</span>'+scorePart+'<span class="side'+(known?'':' tbd')+'">'+esc(awayLabel)+'</span></div>';
+  }
+  function renderPlayoffBracket(state){
+    var p = state.playoff, active = !!(p && p.active);
+    function seedLabel(n){ return n+". Sıra"; }
+    function labelFor(teamId, fallback){ return teamId!=null ? teamName(state,teamId) : fallback; }
+    var qfPairs = [[1,8],[4,5],[2,7],[3,6]];
+    var qfRows = qfPairs.map(function(pair,i){
+      var m = active ? p.qf[i] : null;
+      var homeLabel = active ? labelFor(m.home, seedLabel(pair[0])) : seedLabel(pair[0]);
+      var awayLabel = active ? labelFor(m.away, seedLabel(pair[1])) : seedLabel(pair[1]);
+      return renderPlayoffMatchRow(state, m, homeLabel, awayLabel);
+    }).join('');
+    var sfFallbacks = [["1. Çeyrek Final galibi","2. Çeyrek Final galibi"],["3. Çeyrek Final galibi","4. Çeyrek Final galibi"]];
+    var sfRows = [0,1].map(function(i){
+      var m = active ? p.sf[i] : null;
+      var homeLabel = active ? labelFor(m.home, sfFallbacks[i][0]) : sfFallbacks[i][0];
+      var awayLabel = active ? labelFor(m.away, sfFallbacks[i][1]) : sfFallbacks[i][1];
+      return renderPlayoffMatchRow(state, m, homeLabel, awayLabel);
+    }).join('');
+    var finalM = active ? p.final : null;
+    var finalHome = active ? labelFor(finalM.home,"1. Yarı Final galibi") : "1. Yarı Final galibi";
+    var finalAway = active ? labelFor(finalM.away,"2. Yarı Final galibi") : "2. Yarı Final galibi";
+    var finalRow = renderPlayoffMatchRow(state, finalM, finalHome, finalAway, "po-final");
+    var thirdM = active ? p.third : null;
+    var thirdHome = active ? labelFor(thirdM.home,"1. Yarı Final kaybedeni") : "1. Yarı Final kaybedeni";
+    var thirdAway = active ? labelFor(thirdM.away,"2. Yarı Final kaybedeni") : "2. Yarı Final kaybedeni";
+    var thirdRow = renderPlayoffMatchRow(state, thirdM, thirdHome, thirdAway);
+    return '<div class="po-bracket">' +
+      '<div class="po-round"><div class="po-round-label">Çeyrek Final</div>'+qfRows+'</div>' +
+      '<div class="po-round"><div class="po-round-label">Yarı Final</div>'+sfRows+'</div>' +
+      '<div class="po-round"><div class="po-round-label">Final</div>'+finalRow+'</div>' +
+      '<div class="po-round"><div class="po-third-label">3.lük Maçı</div>'+thirdRow+'</div>' +
+    '</div>';
+  }
+  function renderPlayoff(state){
+    if (!state.drawnAt || !state.playoff || !state.playoff.active) return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel empty-state">Play-Off henüz aktif değil.</div></div>';
+    return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel" style="overflow-x:auto">'+renderPlayoffBracket(state)+'</div></div>';
+  }
+
+  function renderGolKrallik(state){
+    if (!state.drawnAt) return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel empty-state">Gol krallığı, kura çekildikten sonra burada görünecek.</div></div>';
+    var rows = computeTopScorers(state);
+    var list = rows.map(function(r,i){
+      return '<div class="leader-row"><span class="leader-rank">'+(i+1)+'</span><span class="leader-name">'+esc(r.name)+'</span><span class="leader-team">'+esc(r.teamName)+'</span><span class="leader-count">'+r.goals+'</span></div>';
+    }).join('');
+    return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel"><div class="section-head"><h2>Gol Krallığı</h2></div><div class="stage" style="margin-top:12px;gap:6px">'+(list||'<span class="note">Henüz gol kaydı yok.</span>')+'</div></div></div>';
+  }
+  function renderKartlar(state){
+    if (!state.drawnAt) return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel empty-state">Kartlar, kura çekildikten sonra burada görünecek.</div></div>';
+    var totals = computeCardTotals(state), suspended = computeSuspensions(state);
+    function rowsFor(list){
+      return list.map(function(r){
+        var susp = suspended[r.playerId] ? '<span class="susp-badge">Cezalı</span>' : '';
+        return '<div class="leader-row"><span class="leader-name">'+esc(r.name)+'</span><span class="leader-team">'+esc(r.teamName)+'</span><span class="leader-count">'+r.count+'</span>'+susp+'</div>';
+      }).join('') || '<span class="note">Henüz kayıt yok.</span>';
+    }
+    var yellowBlock = '<div class="panel"><div class="section-head"><h2><span class="card-icon card-icon-yellow"></span> Sarı Kartlar</h2></div><div class="stage" style="margin-top:12px;gap:6px">'+rowsFor(totals.yellow)+'</div></div>';
+    var redBlock = '<div class="panel"><div class="section-head"><h2><span class="card-icon card-icon-red"></span> Kırmızı Kartlar</h2></div><div class="stage" style="margin-top:12px;gap:6px">'+rowsFor(totals.red)+'</div></div>';
+    return '<div class="stage">'+renderSummaryStrip(state)+yellowBlock+redBlock+'</div>';
+  }
+
+  function render(){
+    document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.tab===uiTab); });
+    var renderers = { ozet:renderOzet, fikstur:renderFikstur, puan:renderPuanDurumu, playoff:renderPlayoff, krallik:renderGolKrallik, kartlar:renderKartlar };
+    var fn = renderers[uiTab] || renderOzet;
+    document.getElementById("content").innerHTML = fn(state);
+  }
+
+  document.getElementById("tabs").addEventListener("click", function(e){
+    var btn = e.target.closest(".tab-btn");
+    if (!btn) return;
+    uiTab = btn.dataset.tab;
+    render();
+  });
+  document.getElementById("content").addEventListener("change", function(e){
+    if (e.target.id==="ozetTeamSelect"){ uiState.selectedTeamId=e.target.value; render(); }
+  });
+
+  connect();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1036 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BETEK Cup — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+  :root{
+    --bg:#F6F7F2; --surface:#FFFFFF; --surface-2:#EDF1E7; --ink:#14211B; --ink-muted:#4B5850;
+    --border:#D7DECC; --accent:#1E6B45; --accent-strong:#124D31; --accent-ink:#FFFFFF;
+    --brick:#B14B34; --shadow:0 1px 2px rgba(18,32,20,.06),0 6px 16px rgba(18,32,20,.05);
+    --radius-card:8px; --font-display:'Oswald','Arial Narrow',sans-serif;
+    --font-body:'IBM Plex Sans',-apple-system,'Segoe UI',sans-serif; --font-mono:'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0E1712; --surface:#16211B; --surface-2:#1D2A22; --ink:#EFF3EA; --ink-muted:#9BAA9C;
+      --border:#2B3A30; --accent:#4CAE7C; --accent-strong:#6FC896; --accent-ink:#0E1712; --brick:#E07A5F;
+      --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 20px rgba(0,0,0,.35); }
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-body); font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased; }
+  h1,h2,h3{ font-family:var(--font-display); font-weight:600; margin:0; letter-spacing:.2px; }
+  .mono{ font-family:var(--font-mono); }
+  button{ font-family:inherit; }
+  input[type="text"],input[type="number"],input[type="date"],input[type="time"],input[type="password"],textarea,select{
+    font-family:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:7px 9px; font-size:14px;
+  }
+  input[type="number"]{ text-align:center; font-family:var(--font-mono); font-weight:500; }
+  input:focus,button:focus-visible,select:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+  .field{ display:flex; flex-direction:column; gap:5px; font-size:12px; color:var(--ink-muted); }
+  .settings-grid{ display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; }
+
+  .topbar{ position:sticky; top:0; z-index:10; background:var(--surface); border-bottom:1px solid var(--border); }
+  .topbar-inner{ max-width:1000px; margin:0 auto; padding:12px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .brand{ display:flex; align-items:center; gap:10px; color:var(--accent); }
+  .brand-text{ display:flex; flex-direction:column; gap:1px; }
+  .brand-eyebrow{ font-family:var(--font-mono); font-size:10px; letter-spacing:1.4px; color:var(--ink-muted); text-transform:uppercase; }
+  .brand-text h1{ font-size:19px; color:var(--ink); }
+  .ver{ font-family:var(--font-mono); font-size:10px; color:var(--ink-muted); }
+  .status-dot{ width:9px; height:9px; border-radius:50%; background:var(--brick); flex:none; }
+  .status-dot.ok{ background:var(--accent); }
+  .tabs{ display:flex; gap:4px; flex-wrap:wrap; background:var(--surface-2); padding:4px; border-radius:8px; }
+  .tab-btn{ border:none; background:transparent; color:var(--ink-muted); padding:8px 14px; border-radius:6px; font-size:12.5px; font-weight:600; cursor:pointer; font-family:var(--font-display); letter-spacing:.3px; text-transform:uppercase; }
+  .tab-btn.active{ background:var(--accent); color:var(--accent-ink); }
+  .topbar-right{ display:flex; align-items:center; gap:10px; }
+  .icon-btn{ border:1px solid var(--border); background:var(--surface); color:var(--ink-muted); border-radius:6px; padding:6px 9px; font-size:11px; cursor:pointer; }
+  .icon-btn:hover{ border-color:var(--accent); color:var(--ink); }
+
+  .content{ max-width:1000px; margin:0 auto; padding:24px 20px 64px; }
+  .stage{ display:flex; flex-direction:column; gap:20px; }
+  .section-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .section-head h2{ font-size:18px; }
+  .section-sub{ color:var(--ink-muted); font-size:13px; }
+  .panel{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-card); padding:16px 18px; box-shadow:var(--shadow); }
+  .panel.danger-zone{ border-color:var(--brick); }
+  .panel.danger-zone h2{ color:var(--brick); }
+  .note{ font-size:13px; color:var(--ink-muted); line-height:1.55; }
+  .note b{ color:var(--ink); }
+
+  .team-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; }
+  .team-chip{ display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:7px 10px; font-size:13px; }
+  .team-chip button{ border:none; background:none; color:var(--brick); font-size:15px; line-height:1; padding:0 2px; cursor:pointer; }
+
+  .btn{ border:1px solid transparent; border-radius:7px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer; font-family:var(--font-display); letter-spacing:.3px; text-transform:uppercase; }
+  .btn-primary{ background:var(--accent); color:var(--accent-ink); }
+  .btn-primary:hover{ background:var(--accent-strong); }
+  .btn-ghost{ background:transparent; color:var(--brick); border-color:var(--border); }
+  .btn-ghost:hover{ border-color:var(--brick); }
+  .btn-danger{ background:transparent; color:var(--brick); border-color:var(--brick); }
+  .btn-danger:hover{ background:var(--brick); color:#fff; }
+  .btn-row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .btn[disabled]{ opacity:.5; cursor:default; }
+
+  .day-group{ display:flex; flex-direction:column; gap:7px; }
+  .day-head{ display:flex; align-items:baseline; gap:8px; padding-top:4px; }
+  .day-head .d1{ font-family:var(--font-display); font-size:14px; }
+  .day-head .d2{ font-family:var(--font-mono); font-size:11px; color:var(--ink-muted); }
+  .match-row{ display:flex; align-items:center; gap:9px; background:var(--surface); border:1px solid var(--border); border-radius:7px; padding:8px 11px; }
+  .tag{ font-family:var(--font-mono); font-size:10px; color:var(--ink-muted); background:var(--surface-2); border-radius:4px; padding:2px 6px; flex:none; }
+  .tag.time{ background:var(--surface); border:1px solid var(--border); }
+  .match-row .side{ flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .match-row .side.home{ text-align:right; }
+  .match-row .score{ display:flex; align-items:center; gap:5px; flex:none; }
+  .match-row .score input{ width:36px; padding:5px; }
+  .match-row .score .sep{ color:var(--ink-muted); }
+  .match-row .score-static{ font-family:var(--font-mono); font-weight:600; color:var(--accent-strong); flex:none; min-width:36px; text-align:center; }
+  .match-row.pending{ opacity:.85; }
+  .match-row-wrap{ display:flex; flex-direction:column; gap:6px; }
+  .match-row .detail-toggle-btn{ padding:5px 9px; font-size:10.5px; flex:none; }
+
+  .ozet-picker select{ font-size:14px; flex:1; min-width:200px; }
+  .ozet-picker{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
+  .match-detail{ display:flex; flex-direction:column; gap:12px; background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:12px 14px; }
+  .detail-section{ display:flex; flex-direction:column; gap:8px; }
+  .detail-head{ font-family:var(--font-display); font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--ink-muted); display:flex; align-items:center; gap:6px; }
+  .detail-add-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .detail-add-row select{ flex:1; min-width:190px; }
+  .event-chip-list{ display:flex; flex-direction:column; gap:5px; }
+  .event-chip{ display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font-size:12.5px; }
+  .event-chip-team{ color:var(--ink-muted); font-size:11px; }
+  .event-chip button{ border:none; background:none; color:var(--brick); font-size:15px; line-height:1; padding:0 2px; cursor:pointer; }
+
+  .standings-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  .standings-table th{ font-family:var(--font-mono); font-size:10px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.5px; text-align:center; padding:6px 8px; border-bottom:2px solid var(--border); white-space:nowrap; }
+  .standings-table th:nth-child(2){ text-align:left; }
+  .standings-table td{ padding:7px 8px; text-align:center; border-bottom:1px solid var(--border); }
+  .standings-table td.team-cell{ text-align:left; font-weight:600; white-space:nowrap; }
+  .standings-table td.pts{ font-family:var(--font-mono); font-weight:700; color:var(--accent-strong); }
+  .standings-table tr.po-qualify td.team-cell{ box-shadow:inset 3px 0 0 var(--accent); padding-left:9px; }
+  .standings-table tr.po-divider td{ padding:4px 8px; border-bottom:1px solid var(--border); }
+  .po-divider-line{ display:flex; align-items:center; gap:8px; font-family:var(--font-mono); font-size:9.5px; color:var(--accent-strong); text-transform:uppercase; letter-spacing:.5px; }
+  .po-divider-line::before,.po-divider-line::after{ content:""; flex:1; height:1px; background:var(--accent); opacity:.4; }
+
+  .leader-row{ display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:7px; padding:8px 11px; font-size:13px; }
+  .leader-rank{ font-family:var(--font-mono); color:var(--ink-muted); flex:none; width:18px; text-align:center; }
+  .leader-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+  .leader-team{ color:var(--ink-muted); font-size:12px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .leader-count{ font-family:var(--font-mono); font-weight:700; flex:none; min-width:22px; text-align:center; }
+  .susp-badge{ font-family:var(--font-mono); font-size:9.5px; color:var(--brick); border:1px solid var(--brick); border-radius:4px; padding:3px 6px; flex:none; white-space:nowrap; }
+  .card-icon{ display:inline-block; width:10px; height:14px; border-radius:2px; vertical-align:-2px; }
+  .card-icon-yellow{ background:#E8B923; }
+  .card-icon-red{ background:#C4402C; }
+
+  .po-bracket{ display:flex; flex-direction:column; gap:18px; }
+  .po-round-label{ font-family:var(--font-mono); font-size:10px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:7px; }
+  .po-round{ display:flex; flex-direction:column; gap:7px; }
+  .po-match{ display:flex; align-items:center; gap:9px; background:var(--surface); border:1px solid var(--border); border-radius:7px; padding:8px 11px; }
+  .po-match .side{ flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .po-match .side.home{ text-align:right; }
+  .po-match .side.tbd{ color:var(--ink-muted); font-style:italic; }
+  .po-final{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .po-third-label{ font-size:11px; color:var(--ink-muted); margin-bottom:4px; }
+
+  .toast{ position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:9px 16px; border-radius:7px; font-size:13px; box-shadow:var(--shadow); opacity:0; pointer-events:none; transition:opacity .25s ease; z-index:100; max-width:90vw; text-align:center; }
+  .toast.show{ opacity:1; }
+
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:200; padding:16px; }
+  .modal{ background:var(--surface); border-radius:10px; padding:22px; max-width:380px; width:100%; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:12px; }
+  .modal h2{ font-size:17px; }
+  .modal .field input{ width:100%; }
+
+  .gate-wrap{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .gate-box{ background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:28px; max-width:320px; width:100%; text-align:center; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:14px; }
+  .gate-box input{ text-align:center; }
+
+  @media (max-width:560px){
+    .content{ padding:18px 14px 48px; }
+    .match-row .side{ font-size:12px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="gate" class="gate-wrap" hidden>
+  <div class="gate-box">
+    <h1 style="font-size:20px">BETEK Cup — Admin</h1>
+    <p class="note">Devam etmek için yönetici şifresini girin.</p>
+    <input type="password" id="gatePin" placeholder="Şifre" autocomplete="off">
+    <button class="btn btn-primary" id="gateSubmit">Gir</button>
+  </div>
+</div>
+
+<div id="app" hidden>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <svg width="28" height="28" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16.5" fill="none" stroke="currentColor" stroke-width="2.4"></circle><circle cx="20" cy="20" r="2.6" fill="currentColor"></circle><line x1="20" y1="2.5" x2="20" y2="9.5" stroke="currentColor" stroke-width="2.4"></line><line x1="20" y1="30.5" x2="20" y2="37.5" stroke="currentColor" stroke-width="2.4"></line></svg>
+      <div class="brand-text">
+        <span class="brand-eyebrow">Lig Evresi</span>
+        <h1>Admin <span class="ver">v1.0</span></h1>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab-btn" data-tab="admin">Admin</button>
+      <button class="tab-btn" data-tab="ozet">Özet</button>
+      <button class="tab-btn" data-tab="puan">Puan Durumu</button>
+      <button class="tab-btn" data-tab="playoff">Play-Off</button>
+      <button class="tab-btn" data-tab="krallik">Gol Krallığı</button>
+      <button class="tab-btn" data-tab="kartlar">Kartlar</button>
+    </nav>
+    <div class="topbar-right">
+      <span class="status-dot" id="statusDot" title="Bağlantı durumu"></span>
+      <button class="icon-btn" id="openSettingsBtn">Bağlantı</button>
+      <button class="icon-btn" id="lockBtn">Kilitle</button>
+    </div>
+  </div>
+</header>
+<main class="content" id="content"></main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div id="settingsModal" class="modal-backdrop" hidden>
+  <div class="modal">
+    <h2>Supabase Bağlantısı</h2>
+    <p class="note">Supabase projenizin Project URL ve anon public key değerlerini girin (Project Settings → API).</p>
+    <label class="field">Project URL<input type="text" id="cfgUrl" placeholder="https://xxxxx.supabase.co"></label>
+    <label class="field">Anon public key<input type="text" id="cfgKey" placeholder="eyJhbGciOi..."></label>
+    <div class="btn-row" style="justify-content:flex-end">
+      <button class="btn btn-ghost" id="cancelSettingsBtn">Vazgeç</button>
+      <button class="btn btn-primary" id="saveSettingsBtn">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // BETEK Cup Supabase projesi — varsayılan bağlantı bilgisi (anon public key,
+  // RLS ile korunan bir tabloya erişim veriyor; tarayıcıda görünmesi normaldir).
+  // İleride başka bir projeye geçilirse Bağlantı ekranından değiştirilebilir.
+  var DEFAULT_SUPABASE_URL = "https://arjecfiigkebkeccfpxi.supabase.co";
+  var DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyamVjZmlpZ2tlYmtlY2NmcHhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NDg5NzEsImV4cCI6MjEwNTEyNDk3MX0.YhcLALmCr8IQjTuBZTkJKSjIW8TlXpT6oOzPcgAc2k8";
+
+  var ADMIN_PIN = "Betekcup2026*";
+  var ADMIN_UNLOCK_KEY = "turnuva_admin_unlocked";
+  function isAdminUnlocked(){ try{ return localStorage.getItem(ADMIN_UNLOCK_KEY)==="1"; }catch(e){ return false; } }
+  function setAdminUnlocked(v){ try{ if(v) localStorage.setItem(ADMIN_UNLOCK_KEY,"1"); else localStorage.removeItem(ADMIN_UNLOCK_KEY); }catch(e){} }
+
+  var DEFAULT_START_DATE = "2026-10-05";
+  var DEFAULT_MATCHES_PER_DAY = 2;
+  var DAYS_TR = ["Pazar","Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi"];
+  var DAYS_TR_SHORT = ["Paz","Pzt","Sal","Çar","Per","Cum","Cmt"];
+  var MONTHS_TR = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+
+  function newId(){ return "t"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+  function freshState(){
+    return {
+      settings:{ startDate:DEFAULT_START_DATE, slot1Time:"17:00", slot2Time:"18:00", slot3Time:"19:00", matchesPerDay:DEFAULT_MATCHES_PER_DAY, rounds:4 },
+      teams:[], matches:[], drawnAt:null, playoff:null
+    };
+  }
+  function normalizePlayoffMatch(m){
+    if (!m) return { home:null, away:null, hs:null, as:null, events:[] };
+    return { home:m.home===undefined?null:m.home, away:m.away===undefined?null:m.away, hs:m.hs===undefined?null:m.hs, as:m.as===undefined?null:m.as, events:Array.isArray(m.events)?m.events:[] };
+  }
+  function normalizePlayoff(d){
+    if (!d || !d.active) return null;
+    return {
+      active:true, seeds:Array.isArray(d.seeds)?d.seeds:[],
+      qf:Array.isArray(d.qf)?d.qf.map(normalizePlayoffMatch):[],
+      sf:Array.isArray(d.sf)?d.sf.map(function(s,i){ var nm=normalizePlayoffMatch(s); nm.fromQF=Array.isArray(s&&s.fromQF)?s.fromQF:[i*2,i*2+1]; return nm; }):[],
+      final:normalizePlayoffMatch(d.final), third:normalizePlayoffMatch(d.third)
+    };
+  }
+  function normalizeState(d){
+    var f = freshState();
+    if (!d) return f;
+    try{ d = JSON.parse(JSON.stringify(d)); }catch(e){}
+    if (d.settings){
+      if (d.settings.startDate) f.settings.startDate = d.settings.startDate;
+      if (d.settings.slot1Time) f.settings.slot1Time = d.settings.slot1Time;
+      if (d.settings.slot2Time) f.settings.slot2Time = d.settings.slot2Time;
+      if (d.settings.slot3Time) f.settings.slot3Time = d.settings.slot3Time;
+      f.settings.matchesPerDay = (d.settings.matchesPerDay===3) ? 3 : 2;
+      if (d.settings.rounds) f.settings.rounds = d.settings.rounds;
+    }
+    if (Array.isArray(d.teams)) f.teams = d.teams.map(function(t){ return { id:t.id, name:t.name, players:Array.isArray(t.players)?t.players:[] }; });
+    if (Array.isArray(d.matches)) f.matches = d.matches.map(function(m){
+      return { round:m.round, home:m.home, away:m.away, hs:m.hs===undefined?null:m.hs, as:m.as===undefined?null:m.as, dayIndex:m.dayIndex, slotPos:m.slotPos, events:Array.isArray(m.events)?m.events:[] };
+    });
+    if (d.drawnAt) f.drawnAt = d.drawnAt;
+    f.playoff = normalizePlayoff(d.playoff);
+    return f;
+  }
+
+  function shuffle(a){ for (var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+
+  function roundRobinRounds(order, numRounds){
+    var teams = order.slice();
+    if (teams.length % 2 !== 0) teams.push(null);
+    var n = teams.length;
+    var arr = teams.slice();
+    var rounds = [];
+    for (var r=0;r<numRounds;r++){
+      var pairs = [];
+      for (var i=0;i<n/2;i++){ var a=arr[i], b=arr[n-1-i]; if (a!=null && b!=null) pairs.push([a,b]); }
+      rounds.push(pairs);
+      var fixed = arr[0]; var rest = arr.slice(1); rest.unshift(rest.pop()); arr = [fixed].concat(rest);
+    }
+    return rounds;
+  }
+  function maxRoundsFor(teamCount){ var n2 = teamCount%2===0?teamCount:teamCount+1; return Math.max(1, n2-1); }
+
+  // Greedy day-by-day scheduler (round-major, rest-aware, weekday-diversity-aware) —
+  // ported unchanged from the Lig Evresi Kurası Claude Artifact, where it was
+  // built and tested across dozens of team-count/start-date combinations.
+  function scheduleWithRest(flat, teamIds, matchesPerDay, startISO){
+    var perDay = matchesPerDay===3 ? 3 : 2;
+    var byRound = {}, roundOrder = [];
+    flat.forEach(function(m){ if (!byRound[m.round]){ byRound[m.round]=[]; roundOrder.push(m.round); } byRound[m.round].push(m); });
+    var weekdayTable = startISO ? weekdayDates(startISO, flat.length+10).map(function(d){ return d.getDay(); }) : null;
+    var playedWeekday = {};
+    teamIds.forEach(function(id){ playedWeekday[id] = {}; });
+    var out = [];
+    var lastDay = {};
+    teamIds.forEach(function(id){ lastDay[id] = -Infinity; });
+    var dayIndex = 0, guard = 0;
+    roundOrder.forEach(function(rnd){
+      var queue = byRound[rnd].slice();
+      while (queue.length && guard < 20000){
+        guard++;
+        var used = {};
+        var wd = weekdayTable ? weekdayTable[dayIndex] : null;
+        for (var slot=0; slot<perDay; slot++){
+          var bestIdx=-1, bestScore=-Infinity;
+          for (var i=0;i<queue.length;i++){
+            var m = queue[i];
+            if (used[m.home] || used[m.away]) continue;
+            var gapH = dayIndex - lastDay[m.home];
+            var gapA = dayIndex - lastDay[m.away];
+            var allowed = gapH>1 && gapA>1;
+            var bottleneck = Math.min(gapH, gapA);
+            var freshWeekdays = 0;
+            if (wd!=null){ if (!playedWeekday[m.home][wd]) freshWeekdays++; if (!playedWeekday[m.away][wd]) freshWeekdays++; }
+            var score = (allowed?1000000:0) + freshWeekdays*50 + bottleneck;
+            if (score>bestScore){ bestScore=score; bestIdx=i; }
+          }
+          if (bestIdx===-1) break;
+          var chosen = queue[bestIdx];
+          queue.splice(bestIdx,1);
+          out.push({round:chosen.round, home:chosen.home, away:chosen.away, hs:null, as:null, dayIndex:dayIndex, slotPos:slot});
+          used[chosen.home]=true; used[chosen.away]=true;
+          lastDay[chosen.home]=dayIndex; lastDay[chosen.away]=dayIndex;
+          if (wd!=null){ playedWeekday[chosen.home][wd]=true; playedWeekday[chosen.away][wd]=true; }
+        }
+        dayIndex++;
+      }
+    });
+    return out;
+  }
+
+  function weekdayDates(startISO, count){
+    var dates = [], d = new Date(startISO+"T00:00:00");
+    while (dates.length < count){ var day=d.getDay(); if (day!==0 && day!==6) dates.push(new Date(d)); d=new Date(d); d.setDate(d.getDate()+1); }
+    return dates;
+  }
+  function fmtDateLong(d){ return DAYS_TR[d.getDay()]+", "+d.getDate()+" "+MONTHS_TR[d.getMonth()]+" "+d.getFullYear(); }
+  function fmtDateShort(d){ return DAYS_TR_SHORT[d.getDay()]+" "+String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear(); }
+  function fmtDateCompact(d){ return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0"); }
+  function timeForSlotPos(state, pos){ if (pos===0) return state.settings.slot1Time; if (pos===1) return state.settings.slot2Time; return state.settings.slot3Time||"19:00"; }
+  function dayCount(state){ if (!state.matches.length) return 0; var max=0; state.matches.forEach(function(m){ if (m.dayIndex>max) max=m.dayIndex; }); return max+1; }
+  function calendar(state){ return weekdayDates(state.settings.startDate, dayCount(state)); }
+  function teamName(state, id){ if (id==null) return null; for (var i=0;i<state.teams.length;i++){ if (state.teams[i].id===id) return state.teams[i].name; } return "?"; }
+  function findTeam(state, teamId){ for (var i=0;i<state.teams.length;i++){ if (state.teams[i].id===teamId) return state.teams[i]; } return null; }
+  function playerName(state, teamId, playerId){ var team=findTeam(state,teamId); if (!team||!Array.isArray(team.players)) return "?"; for (var i=0;i<team.players.length;i++){ if (team.players[i].id===playerId) return team.players[i].name; } return "?"; }
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function toast(msg){ var el=document.getElementById("toast"); el.textContent=msg; el.classList.add("show"); setTimeout(function(){ el.classList.remove("show"); }, 2800); }
+
+  // ---- state / persistence (Supabase: one JSONB row, id="main") ----
+  var state = freshState();
+  var uiTab = "admin";
+  var uiState = { confirmReset:false, confirmPlayoffReset:false, confirmWipeAll:false, selectedTeamId:null, rosterTeamId:null, expandedMatches:{} };
+  var supabaseClient = null;
+  var localDirty = false;
+  var writeChain = Promise.resolve();
+
+  function getConfig(){
+    try{ return { url: localStorage.getItem("turnuva_supabase_url")||DEFAULT_SUPABASE_URL, key: localStorage.getItem("turnuva_supabase_key")||DEFAULT_SUPABASE_KEY }; }catch(e){ return {url:DEFAULT_SUPABASE_URL,key:DEFAULT_SUPABASE_KEY}; }
+  }
+  function setConfig(url,key){ try{ localStorage.setItem("turnuva_supabase_url",url); localStorage.setItem("turnuva_supabase_key",key); }catch(e){} }
+
+  function persist(){
+    if (!supabaseClient) return;
+    localDirty = true;
+    writeChain = writeChain.then(function(){
+      return supabaseClient.from("turnuva_state").update({ data: state, updated_at: new Date().toISOString() }).eq("id","main");
+    }).then(function(r){
+      if (r && r.error) toast("Kaydedilemedi: " + r.error.message);
+    }).catch(function(e){
+      toast("Kaydedilemedi: " + (e && e.message ? e.message : "bağlantı hatası"));
+    }).then(function(){ localDirty = false; });
+  }
+
+  async function connect(){
+    var cfg = getConfig();
+    if (!cfg.url || !cfg.key){ document.getElementById("statusDot").classList.remove("ok"); openSettings(); return; }
+    try{
+      supabaseClient = supabase.createClient(cfg.url, cfg.key);
+      var r = await supabaseClient.from("turnuva_state").select("data").eq("id","main").maybeSingle();
+      if (r.error) throw r.error;
+      state = r.data && r.data.data ? normalizeState(r.data.data) : freshState();
+      document.getElementById("statusDot").classList.add("ok");
+      render();
+      supabaseClient.channel("turnuva_state_changes")
+        .on("postgres_changes", { event:"UPDATE", schema:"public", table:"turnuva_state", filter:"id=eq.main" }, function(payload){
+          if (localDirty) return;
+          state = normalizeState(payload.new && payload.new.data);
+          render();
+        })
+        .subscribe();
+    }catch(e){
+      document.getElementById("statusDot").classList.remove("ok");
+      toast("Bağlantı kurulamadı: " + (e && e.message ? e.message : "bilinmeyor"));
+    }
+  }
+  function openSettings(){
+    var cfg = getConfig();
+    document.getElementById("cfgUrl").value = cfg.url;
+    document.getElementById("cfgKey").value = cfg.key;
+    document.getElementById("settingsModal").hidden = false;
+  }
+  document.getElementById("openSettingsBtn").addEventListener("click", openSettings);
+  document.getElementById("cancelSettingsBtn").addEventListener("click", function(){ document.getElementById("settingsModal").hidden = true; });
+  document.getElementById("saveSettingsBtn").addEventListener("click", function(){
+    var url = document.getElementById("cfgUrl").value.trim();
+    var key = document.getElementById("cfgKey").value.trim();
+    if (!url || !key){ toast("URL ve anon key gerekli."); return; }
+    setConfig(url,key);
+    document.getElementById("settingsModal").hidden = true;
+    connect();
+  });
+
+  // ---- admin PIN gate ----
+  function showGate(){ document.getElementById("gate").hidden = false; document.getElementById("app").hidden = true; }
+  function showApp(){ document.getElementById("gate").hidden = true; document.getElementById("app").hidden = false; }
+  document.getElementById("gateSubmit").addEventListener("click", attemptUnlock);
+  document.getElementById("gatePin").addEventListener("keydown", function(e){ if (e.key==="Enter"){ e.preventDefault(); attemptUnlock(); } });
+  function attemptUnlock(){
+    var input = document.getElementById("gatePin");
+    if (input.value === ADMIN_PIN){ setAdminUnlocked(true); showApp(); connect(); }
+    else { toast("Hatalı şifre."); input.value=""; input.focus(); }
+  }
+  document.getElementById("lockBtn").addEventListener("click", function(){ setAdminUnlocked(false); location.reload(); });
+
+  // ---- teams / players ----
+  function addTeamFromInput(){
+    var input = document.getElementById("newTeamName");
+    if (!input) return;
+    var name = input.value.trim();
+    if (!name) return;
+    state.teams.push({id:newId(), name:name, players:[]});
+    input.value=""; render(); persist();
+  }
+  function addTeamsFromBulk(){
+    var box = document.getElementById("bulkTeamNames");
+    if (!box) return;
+    var names = box.value.split("\n").map(function(s){ return s.trim(); }).filter(function(s){ return s.length>0; });
+    if (!names.length) return;
+    names.forEach(function(name){ state.teams.push({id:newId(), name:name.slice(0,40), players:[]}); });
+    box.value=""; render(); persist(); toast(names.length+" takım eklendi.");
+  }
+  function removeTeam(id){ if (state.drawnAt) return; state.teams = state.teams.filter(function(t){ return t.id!==id; }); render(); persist(); }
+  function updateSetting(key,value){ state.settings[key]=value; render(); persist(); }
+
+  function rescheduleMatches(){
+    var flat = state.matches.map(function(m){ return {round:m.round, home:m.home, away:m.away}; });
+    var teamIds = state.teams.map(function(t){ return t.id; });
+    var newSched = scheduleWithRest(flat, teamIds, state.settings.matchesPerDay, state.settings.startDate);
+    var byKey = {};
+    state.matches.forEach(function(m){ byKey[m.round+"|"+m.home+"|"+m.away]=m; });
+    state.matches = newSched.map(function(s){
+      var old = byKey[s.round+"|"+s.home+"|"+s.away];
+      return { round:s.round, home:s.home, away:s.away, hs:old?old.hs:null, as:old?old.as:null, dayIndex:s.dayIndex, slotPos:s.slotPos, events:(old&&Array.isArray(old.events))?old.events:[] };
+    });
+    uiState.expandedMatches = {};
+  }
+  function updateMatchesPerDay(mpd){ state.settings.matchesPerDay = mpd===3?3:2; if (state.drawnAt) rescheduleMatches(); render(); persist(); }
+  function updateStartDate(v){ state.settings.startDate=v; if (state.drawnAt) rescheduleMatches(); render(); persist(); }
+  function rescheduleDaysManually(){ if (!state.drawnAt) return; rescheduleMatches(); render(); persist(); toast("Fikstür gün dağılımına göre yeniden düzenlendi."); }
+
+  function addPlayerFromInput(){
+    var team = findTeam(state, uiState.rosterTeamId);
+    var input = document.getElementById("newPlayerName");
+    if (!team || !input) return;
+    var name = input.value.trim();
+    if (!name) return;
+    if (!Array.isArray(team.players)) team.players=[];
+    team.players.push({id:newId(), name:name.slice(0,40)});
+    input.value=""; render(); persist();
+  }
+  function addPlayersFromBulk(){
+    var team = findTeam(state, uiState.rosterTeamId);
+    var box = document.getElementById("bulkPlayerNames");
+    if (!team || !box) return;
+    var names = box.value.split("\n").map(function(s){ return s.trim(); }).filter(function(s){ return s.length>0; });
+    if (!names.length) return;
+    if (!Array.isArray(team.players)) team.players=[];
+    names.forEach(function(name){ team.players.push({id:newId(), name:name.slice(0,40)}); });
+    box.value=""; render(); persist(); toast(names.length+" oyuncu eklendi.");
+  }
+  function removePlayer(teamId, playerId){
+    var team = findTeam(state, teamId);
+    if (!team) return;
+    team.players = (team.players||[]).filter(function(p){ return p.id!==playerId; });
+    render(); persist();
+  }
+
+  // ---- match events (goals/cards), addressed by a "ref": a plain numeric
+  // string for a league match ("3") or "playoff:qf:N" / "playoff:sf:N" /
+  // "playoff:final" / "playoff:third" for a play-off slot ----
+  function getMatchByRef(ref){
+    ref = String(ref);
+    if (ref.indexOf("playoff:")===0){
+      var p = state.playoff;
+      if (!p) return null;
+      var parts = ref.split(":");
+      if (parts[1]==="qf") return p.qf[parseInt(parts[2],10)] || null;
+      if (parts[1]==="sf") return p.sf[parseInt(parts[2],10)] || null;
+      if (parts[1]==="final") return p.final;
+      if (parts[1]==="third") return p.third;
+      return null;
+    }
+    return state.matches[parseInt(ref,10)] || null;
+  }
+  function toggleMatchDetail(ref){ uiState.expandedMatches[ref] = !uiState.expandedMatches[ref]; render(); }
+  function addMatchEvent(ref, type, compoundValue){
+    var m = getMatchByRef(ref);
+    if (!m || !compoundValue) return;
+    var parts = compoundValue.split("|");
+    var teamId=parts[0], playerId=parts[1];
+    if (!teamId || !playerId) return;
+    if (!Array.isArray(m.events)) m.events=[];
+    m.events.push({type:type, teamId:teamId, playerId:playerId});
+    render(); persist();
+  }
+  function removeMatchEvent(ref, eventIndex){
+    var m = getMatchByRef(ref);
+    if (!m || !Array.isArray(m.events)) return;
+    m.events.splice(eventIndex,1);
+    render(); persist();
+  }
+
+  // ---- suspensions (league matches only — see note in reply) ----
+  function computeSuspensions(state){
+    var suspended = {}, byTeam = {};
+    state.matches.forEach(function(m){ (byTeam[m.home]=byTeam[m.home]||[]).push(m); (byTeam[m.away]=byTeam[m.away]||[]).push(m); });
+    Object.keys(byTeam).forEach(function(teamId){
+      var matches = byTeam[teamId].slice().sort(function(a,b){ return (a.dayIndex-b.dayIndex)||(a.slotPos-b.slotPos); });
+      var yellowAcc={}, banRemaining={};
+      for (var i=0;i<matches.length;i++){
+        var m = matches[i];
+        var played = m.hs!=null && m.as!=null;
+        if (!played){ Object.keys(banRemaining).forEach(function(pid){ if (banRemaining[pid]>0) suspended[pid]=true; }); break; }
+        Object.keys(banRemaining).forEach(function(pid){ if (banRemaining[pid]>0) banRemaining[pid]--; });
+        var yellowsThisMatch = {};
+        (m.events||[]).forEach(function(ev){ if (ev.teamId!==teamId||ev.type!=="yellow") return; yellowsThisMatch[ev.playerId]=(yellowsThisMatch[ev.playerId]||0)+1; });
+        Object.keys(yellowsThisMatch).forEach(function(pid){
+          if (yellowsThisMatch[pid]===1){ yellowAcc[pid]=(yellowAcc[pid]||0)+1; if (yellowAcc[pid]>=2){ banRemaining[pid]=(banRemaining[pid]||0)+1; yellowAcc[pid]-=2; } }
+        });
+        (m.events||[]).forEach(function(ev){ if (ev.teamId!==teamId||ev.type!=="red") return; banRemaining[ev.playerId]=(banRemaining[ev.playerId]||0)+1; });
+      }
+    });
+    return suspended;
+  }
+
+  function computeDraw(){
+    var n = state.teams.length;
+    var ids = shuffle(state.teams.map(function(t){ return t.id; }));
+    var rounds = state.settings.rounds || 4;
+    var cap = maxRoundsFor(n);
+    if (rounds>cap) rounds=cap;
+    if (rounds<1) rounds=1;
+    var rr = roundRobinRounds(ids, rounds);
+    var flat = [];
+    rr.forEach(function(pairs, ri){ shuffle(pairs); pairs.forEach(function(p){ flat.push({round:ri+1, home:p[0], away:p[1]}); }); });
+    var scheduled = scheduleWithRest(flat, ids, state.settings.matchesPerDay, state.settings.startDate);
+    return { matches: scheduled, rounds: rounds };
+  }
+  // No live reveal ceremony here (that is specific to the Claude Artifact
+  // version) — the draw is computed and applied immediately.
+  function startDraw(){
+    var n = state.teams.length;
+    if (n<2){ toast("En az 2 takım gerekli."); return; }
+    var computed = computeDraw();
+    state.matches = computed.matches;
+    state.settings.rounds = computed.rounds;
+    state.drawnAt = new Date().toISOString();
+    render(); persist();
+    toast("Kura çekildi.");
+  }
+  function doReset(){
+    state.matches = [];
+    state.drawnAt = null;
+    state.playoff = null;
+    uiState.confirmReset = false;
+    render(); persist();
+  }
+  function updateScore(ref, side, value){
+    var v = value==="" ? null : Math.max(0, Math.min(99, parseInt(value,10)||0));
+    var m = getMatchByRef(ref);
+    if (!m) return;
+    if (side==="h") m.hs=v; else m.as=v;
+    if (String(ref).indexOf("playoff:")===0) advancePlayoff();
+    render(); persist();
+  }
+  function downloadFixture(){
+    if (!state.drawnAt) return;
+    var cal = calendar(state);
+    var payload = {
+      turnuva:"BETEK Cup", indirmeTarihi:new Date().toISOString(), ayarlar:state.settings, takimlar:state.teams,
+      maclar: state.matches.map(function(m){
+        var d = cal[m.dayIndex];
+        return { hafta:m.round, evTakimId:m.home, depTakimId:m.away, ev:teamName(state,m.home), dep:teamName(state,m.away),
+          tarih: d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"),
+          saat: timeForSlotPos(state, m.slotPos), evGol:m.hs, depGol:m.as };
+      })
+    };
+    var blob = new Blob([JSON.stringify(payload,null,2)], {type:"application/json"});
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "betek-cup-fikstur.json";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+    toast("Fikstür indirildi.");
+  }
+
+  // ---- stats ----
+  function computeStandings(state){
+    var table = {};
+    state.teams.forEach(function(t){ table[t.id] = {teamId:t.id, name:t.name, played:0, won:0, draw:0, lost:0, gf:0, ga:0}; });
+    state.matches.forEach(function(m){
+      if (m.hs==null || m.as==null) return;
+      var h=table[m.home], a=table[m.away];
+      if (!h||!a) return;
+      h.played++; a.played++; h.gf+=m.hs; h.ga+=m.as; a.gf+=m.as; a.ga+=m.hs;
+      if (m.hs>m.as){ h.won++; a.lost++; } else if (m.hs<m.as){ a.won++; h.lost++; } else { h.draw++; a.draw++; }
+    });
+    var rows = Object.keys(table).map(function(id){ var r=table[id]; r.avg=r.gf-r.ga; r.pts=r.won*3+r.draw; return r; });
+    rows.sort(function(a,b){ return (b.pts-a.pts)||(b.avg-a.avg)||(b.gf-a.gf)||a.name.localeCompare(b.name,"tr"); });
+    return rows;
+  }
+  function allMatchesWithEvents(state){
+    var list = state.matches.slice();
+    var p = state.playoff;
+    if (p && p.active) list = list.concat(p.qf, p.sf, [p.final, p.third]);
+    return list;
+  }
+  function computeTopScorers(state){
+    var tally = {};
+    allMatchesWithEvents(state).forEach(function(m){
+      (m.events||[]).forEach(function(ev){
+        if (ev.type!=="goal") return;
+        var key = ev.teamId+"|"+ev.playerId;
+        if (!tally[key]) tally[key] = { playerId:ev.playerId, teamId:ev.teamId, name:playerName(state,ev.teamId,ev.playerId), teamName:teamName(state,ev.teamId), goals:0 };
+        tally[key].goals++;
+      });
+    });
+    var rows = Object.keys(tally).map(function(k){ return tally[k]; });
+    rows.sort(function(a,b){ return (b.goals-a.goals)||a.name.localeCompare(b.name,"tr"); });
+    return rows;
+  }
+  function computeCardTotals(state){
+    var yellow={}, red={};
+    allMatchesWithEvents(state).forEach(function(m){
+      (m.events||[]).forEach(function(ev){
+        if (ev.type!=="yellow" && ev.type!=="red") return;
+        var bucket = ev.type==="yellow"?yellow:red;
+        var key = ev.teamId+"|"+ev.playerId;
+        if (!bucket[key]) bucket[key] = { playerId:ev.playerId, teamId:ev.teamId, name:playerName(state,ev.teamId,ev.playerId), teamName:teamName(state,ev.teamId), count:0 };
+        bucket[key].count++;
+      });
+    });
+    function toSorted(bucket){ var rows=Object.keys(bucket).map(function(k){ return bucket[k]; }); rows.sort(function(a,b){ return (b.count-a.count)||a.name.localeCompare(b.name,"tr"); }); return rows; }
+    return { yellow: toSorted(yellow), red: toSorted(red) };
+  }
+
+  // ---- playoff engine ----
+  function matchWinner(m){ if (!m||m.home==null||m.away==null||m.hs==null||m.as==null||m.hs===m.as) return null; return m.hs>m.as?m.home:m.away; }
+  function matchLoser(m){ if (!m||m.home==null||m.away==null||m.hs==null||m.as==null||m.hs===m.as) return null; return m.hs>m.as?m.away:m.home; }
+  function advancePlayoff(){
+    var p = state.playoff;
+    if (!p || !p.active) return;
+    p.sf.forEach(function(sf){
+      var a = matchWinner(p.qf[sf.fromQF[0]]), b = matchWinner(p.qf[sf.fromQF[1]]);
+      if (sf.home!==a || sf.away!==b){ sf.home=a; sf.away=b; sf.hs=null; sf.as=null; sf.events=[]; }
+    });
+    var fa = matchWinner(p.sf[0]), fb = matchWinner(p.sf[1]);
+    if (p.final.home!==fa || p.final.away!==fb){ p.final.home=fa; p.final.away=fb; p.final.hs=null; p.final.as=null; p.final.events=[]; }
+    var la = matchLoser(p.sf[0]), lb = matchLoser(p.sf[1]);
+    if (p.third.home!==la || p.third.away!==lb){ p.third.home=la; p.third.away=lb; p.third.hs=null; p.third.as=null; p.third.events=[]; }
+  }
+  function activatePlayoff(){
+    if (!state.drawnAt) return;
+    if (state.playoff && state.playoff.active) return;
+    var standings = computeStandings(state);
+    if (standings.length < 8){ toast("Playoff için en az 8 takım gerekli."); return; }
+    var seeds = standings.slice(0,8).map(function(r){ return r.teamId; });
+    function mk(seedA, seedB){ return { home:seeds[seedA-1], away:seeds[seedB-1], hs:null, as:null, events:[] }; }
+    state.playoff = {
+      active:true, seeds:seeds,
+      qf:[ mk(1,8), mk(4,5), mk(2,7), mk(3,6) ],
+      sf:[ {fromQF:[0,1],home:null,away:null,hs:null,as:null,events:[]}, {fromQF:[2,3],home:null,away:null,hs:null,as:null,events:[]} ],
+      final:{home:null,away:null,hs:null,as:null,events:[]}, third:{home:null,away:null,hs:null,as:null,events:[]}
+    };
+    render(); persist();
+    toast("Playoff aktifleştirildi — çeyrek final eşleşmeleri güncel puan durumuna göre oluşturuldu.");
+  }
+  function resetPlayoffExecute(){ state.playoff=null; uiState.confirmPlayoffReset=false; render(); persist(); toast("Playoff sıfırlandı."); }
+  function wipeAllExecute(){
+    state = freshState();
+    uiState.confirmWipeAll=false; uiState.confirmReset=false; uiState.confirmPlayoffReset=false;
+    uiState.expandedMatches={}; uiState.selectedTeamId=null; uiState.rosterTeamId=null;
+    render(); persist();
+    toast("Her şey temizlendi — turnuva sıfırdan başlıyor.");
+  }
+
+  // ---- render ----
+  function renderSummaryStrip(state){
+    var days = dayCount(state);
+    var cal = calendar(state);
+    var startLabel = fmtDateCompact(new Date(state.settings.startDate+"T00:00:00"));
+    var endLabel = cal.length ? fmtDateCompact(cal[cal.length-1]) : null;
+    var played = state.matches.filter(function(m){ return m.hs!=null && m.as!=null; }).length;
+    return '<div class="panel" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:14px">' +
+      '<div><div style="font-family:var(--font-display);font-size:20px">'+state.teams.length+'</div><div class="note">Takım</div></div>' +
+      '<div><div style="font-family:var(--font-display);font-size:20px">'+(state.drawnAt?state.matches.length:'—')+'</div><div class="note">Toplam maç</div></div>' +
+      '<div><div style="font-family:var(--font-display);font-size:20px">'+(state.drawnAt?(played+'/'+state.matches.length):'—')+'</div><div class="note">Oynanan</div></div>' +
+      '<div><div style="font-family:var(--font-display);font-size:20px">'+(state.drawnAt?days:'—')+'</div><div class="note">Maç günü</div></div>' +
+      '<div><div style="font-family:var(--font-display);font-size:16px">'+startLabel+(endLabel?(' – '+endLabel):'')+'</div><div class="note">Takvim</div></div>' +
+    '</div>';
+  }
+
+  function renderAdmin(state){
+    var drawn = !!state.drawnAt;
+    var n = state.teams.length;
+    var maxRounds = maxRoundsFor(Math.max(n,2));
+    var roundsDisplay = Math.min(state.settings.rounds, maxRounds);
+
+    var settingsBlock = '<div class="panel">' +
+      '<div class="section-head"><h2>Turnuva Ayarları</h2></div>' +
+      '<div class="settings-grid">' +
+        '<label class="field">Başlangıç tarihi<input type="date" id="startDateInput" value="'+esc(state.settings.startDate)+'"></label>' +
+        '<label class="field">1. maç saati<input type="time" id="slot1Input" value="'+esc(state.settings.slot1Time)+'"></label>' +
+        '<label class="field">2. maç saati<input type="time" id="slot2Input" value="'+esc(state.settings.slot2Time)+'"></label>' +
+        (state.settings.matchesPerDay===3 ? '<label class="field">3. maç saati<input type="time" id="slot3Input" value="'+esc(state.settings.slot3Time||"19:00")+'"></label>' : '') +
+        '<label class="field">Takım başına maç sayısı<input type="number" id="roundsInput" min="1" max="'+maxRounds+'" value="'+roundsDisplay+'" style="width:70px" '+(drawn?'disabled':'')+'></label>' +
+      '</div>' +
+      '<label class="field" style="flex-direction:row;align-items:center;gap:7px;margin-top:12px"><input type="checkbox" id="thirdMatchToggle" style="width:auto" '+(state.settings.matchesPerDay===3?'checked':'')+'> Günde 3. maç ekle (varsayılan: günde 2 maç, 17:00 / 18:00)</label>' +
+      '<div class="note" style="margin-top:10px">Başlangıç tarihini veya maç saatlerini değiştirmek fikstürü otomatik günceller. Cumartesi/pazar maç yok; aynı takım art arda iki maç gününde oynamaz.</div>' +
+    '</div>';
+
+    var teamChips = state.teams.map(function(t){
+      return '<div class="team-chip"><span>'+esc(t.name)+'</span>'+(drawn?'':'<button data-remove-team="'+t.id+'" title="Sil">×</button>')+'</div>';
+    }).join('');
+    var oddNote = (!drawn && n%2!==0 && n>0) ? '<div class="note" style="margin-top:8px">Takım sayısı tek ('+n+'). Her turda bir takım <b>bay</b> geçer.</div>' : '';
+    var teamsBlock = '<div class="panel">' +
+      '<div class="section-head"><h2>Takımlar ('+n+')</h2></div>' +
+      (drawn ? '<div class="note" style="margin-top:8px">Kura çekildi, takım listesi kilitli.</div>' :
+        '<div class="btn-row" style="margin-top:10px"><input type="text" id="newTeamName" placeholder="Takım adı" style="flex:1;min-width:180px" maxlength="40"><button class="btn btn-primary" id="addTeamBtn">Ekle</button></div>' +
+        '<div style="margin-top:10px"><label class="field">Toplu ekleme (her satıra bir takım adı)<textarea id="bulkTeamNames" rows="4" style="width:100%;resize:vertical"></textarea></label>' +
+          '<div class="btn-row" style="margin-top:8px"><button class="btn btn-ghost" data-action="bulk-add">Toplu Ekle</button></div></div>') +
+      oddNote +
+      '<div class="team-grid" style="margin-top:12px">'+(teamChips||'<span class="note">Henüz takım eklenmedi.</span>')+'</div>' +
+    '</div>';
+
+    var rosterBlock = '';
+    if (n>0){
+      if (uiState.rosterTeamId==null || !state.teams.some(function(t){ return t.id===uiState.rosterTeamId; })) uiState.rosterTeamId = state.teams[0].id;
+      var rosterTeam = findTeam(state, uiState.rosterTeamId);
+      var rosterOptions = state.teams.slice().sort(function(a,b){ return a.name.localeCompare(b.name,"tr"); }).map(function(t){
+        return '<option value="'+esc(t.id)+'"'+(t.id===uiState.rosterTeamId?' selected':'')+'>'+esc(t.name)+'</option>';
+      }).join('');
+      var rosterPlayers = (rosterTeam && rosterTeam.players) || [];
+      var playerChips = rosterPlayers.map(function(p){
+        return '<div class="team-chip"><span>'+esc(p.name)+'</span><button data-remove-player="'+esc(rosterTeam.id)+':'+esc(p.id)+'" title="Sil">×</button></div>';
+      }).join('');
+      rosterBlock = '<div class="panel">' +
+        '<div class="section-head"><h2>Oyuncu Kadroları</h2></div>' +
+        '<div class="ozet-picker" style="margin-top:10px"><select id="rosterTeamSelect">'+rosterOptions+'</select></div>' +
+        '<div class="btn-row" style="margin-top:10px"><input type="text" id="newPlayerName" placeholder="Oyuncu adı soyadı" style="flex:1;min-width:180px" maxlength="40"><button class="btn btn-primary" id="addPlayerBtn">Ekle</button></div>' +
+        '<div style="margin-top:10px"><label class="field">Toplu ekleme (her satıra bir isim)<textarea id="bulkPlayerNames" rows="4" style="width:100%;resize:vertical"></textarea></label>' +
+          '<div class="btn-row" style="margin-top:8px"><button class="btn btn-ghost" data-action="bulk-add-player">Toplu Ekle</button></div></div>' +
+        '<div class="team-grid" style="margin-top:12px">'+(playerChips||'<span class="note">Bu takımda henüz oyuncu yok.</span>')+'</div>' +
+      '</div>';
+    }
+
+    var drawBlock = '';
+    if (!drawn){
+      drawBlock = '<div class="btn-row"><button class="btn btn-primary" data-action="draw" '+(n<2?'disabled':'')+'>Kurayı Çek</button></div>';
+    } else {
+      drawBlock = '<div class="btn-row">' +
+        (uiState.confirmReset
+          ? '<span class="note"><b>Emin misiniz?</b> Girilmiş tüm sonuçlar silinir.</span> <button class="btn btn-ghost" data-action="reset-execute">Evet, yeniden çek</button> <button class="btn btn-ghost" data-action="reset-cancel">Vazgeç</button>'
+          : '<button class="btn btn-primary" data-action="download">Fikstürü İndir (JSON)</button> <button class="btn btn-ghost" data-action="reschedule-days">Fikstürü Güne Göre Yeniden Düzenle</button> <button class="btn btn-ghost" data-action="reset-ask">Kurayı Yenile</button>') +
+        '</div>';
+    }
+
+    var fixtureBlock = drawn ? ('<div class="section-head"><h2>Sonuç Girişi</h2><span class="section-sub">'+fmtDateLong(new Date(state.drawnAt))+' tarihinde çekildi</span></div>' + renderFixtureList(state, true)) : '';
+
+    var pState = state.playoff, pActive = !!(pState && pState.active);
+    var standingsCount = computeStandings(state).length;
+    var playoffBlock = '';
+    if (drawn){
+      var pControls;
+      if (!pActive){
+        pControls = standingsCount<8 ? '<div class="note">Playoff için en az 8 takım gerekli (şu an '+standingsCount+').</div>' : '<div class="btn-row"><button class="btn btn-primary" data-action="activate-playoff">Playoff\'u Aktif Et</button></div>';
+      } else if (uiState.confirmPlayoffReset){
+        pControls = '<div class="btn-row"><span class="note"><b>Emin misiniz?</b></span> <button class="btn btn-ghost" data-action="reset-playoff-execute">Evet, playoff\'u sıfırla</button> <button class="btn btn-ghost" data-action="reset-playoff-cancel">Vazgeç</button></div>';
+      } else {
+        pControls = '<div class="btn-row"><button class="btn btn-ghost" data-action="reset-playoff-ask">Playoff\'u Sıfırla</button></div>';
+      }
+      var pBracket = pActive ? ('<div style="overflow-x:auto;margin-top:14px">'+renderPlayoffBracket(state,true)+'</div>') : '';
+      playoffBlock = '<div class="panel"><div class="section-head"><h2>Play-Off</h2><span class="section-sub">'+(pActive?'aktif':'henüz aktif değil')+'</span></div>' + pControls + pBracket + '</div>';
+    }
+
+    var dangerZoneBlock = '<div class="panel danger-zone"><div class="section-head"><h2>Tehlikeli Bölge</h2></div>' +
+      (uiState.confirmWipeAll
+        ? '<div class="btn-row"><span class="note"><b>Emin misiniz?</b> Takımlar, kura, fikstür, playoff ve tüm sonuç/gol/kart kayıtları kalıcı olarak silinir.</span> <button class="btn btn-danger" data-action="wipe-all-execute">Evet, her şeyi sil</button> <button class="btn btn-ghost" data-action="wipe-all-cancel">Vazgeç</button></div>'
+        : '<div class="btn-row"><button class="btn btn-danger" data-action="wipe-all-ask">Her Şeyi Temizle</button></div>') +
+    '</div>';
+
+    return '<div class="stage">' + renderSummaryStrip(state) + settingsBlock + teamsBlock + rosterBlock + drawBlock + fixtureBlock + playoffBlock + dangerZoneBlock + '</div>';
+  }
+
+  function renderMatchDetail(state, m, idx){
+    var homeTeam = findTeam(state,m.home), awayTeam = findTeam(state,m.away);
+    function optionsFor(){
+      var html = "";
+      [homeTeam, awayTeam].forEach(function(team){
+        if (!team) return;
+        var players = team.players || [];
+        html += '<optgroup label="'+esc(team.name)+'">';
+        html += players.length ? players.map(function(p){ return '<option value="'+esc(team.id)+'|'+esc(p.id)+'">'+esc(p.name)+'</option>'; }).join('') : '<option value="" disabled>(kadro boş)</option>';
+        html += '</optgroup>';
+      });
+      return html;
+    }
+    function section(type, title, iconClass){
+      var selId = "eventSelect-"+idx+"-"+type;
+      var rows = (m.events||[]).map(function(ev,evIdx){ return {ev:ev, evIdx:evIdx}; }).filter(function(x){ return x.ev.type===type; }).map(function(x){
+        return '<div class="event-chip"><span>'+esc(playerName(state,x.ev.teamId,x.ev.playerId))+' <span class="event-chip-team">('+esc(teamName(state,x.ev.teamId))+')</span></span><button data-remove-event="'+idx+'||'+x.evIdx+'" title="Sil">×</button></div>';
+      }).join('');
+      return '<div class="detail-section"><div class="detail-head">'+(iconClass?'<span class="card-icon '+iconClass+'"></span>':'')+title+'</div>' +
+        '<div class="detail-add-row"><select id="'+selId+'">'+optionsFor()+'</select><button class="btn btn-ghost" data-action="add-event" data-match-idx="'+idx+'" data-event-type="'+type+'" data-target="'+selId+'">Ekle</button></div>' +
+        '<div class="event-chip-list">'+(rows||'<span class="note">Henüz yok.</span>')+'</div></div>';
+    }
+    return '<div class="match-detail">'+section("goal","Goller",null)+section("yellow","Sarı Kartlar","card-icon-yellow")+section("red","Kırmızı Kartlar","card-icon-red")+'</div>';
+  }
+
+  function renderFixtureList(state, editable){
+    var cal = calendar(state);
+    var groups = {};
+    state.matches.forEach(function(m,idx){ m.__idx=idx; (groups[m.dayIndex]=groups[m.dayIndex]||[]).push(m); });
+    var html = "";
+    for (var di=0; di<cal.length; di++){
+      var date = cal[di];
+      if (!groups[di]) continue;
+      var rows = groups[di].map(function(m){
+        var played = m.hs!=null && m.as!=null;
+        var scorePart = editable
+          ? '<span class="score"><input type="number" min="0" max="99" data-match-idx="'+m.__idx+'" data-side="h" value="'+(m.hs==null?'':m.hs)+'"><span class="sep">:</span><input type="number" min="0" max="99" data-match-idx="'+m.__idx+'" data-side="a" value="'+(m.as==null?'':m.as)+'"></span>'
+          : '<span class="score-static">'+(played?(m.hs+' : '+m.as):'vs')+'</span>';
+        var detailToggle = editable ? '<button class="btn btn-ghost detail-toggle-btn" data-action="toggle-detail" data-match-idx="'+m.__idx+'">'+(uiState.expandedMatches[m.__idx]?'Kapat':'Gol / Kart')+'</button>' : '';
+        var matchRow = '<div class="match-row '+(played?'':'pending')+'">' +
+          '<span class="tag">'+m.round+'. HAFTA</span><span class="tag time mono">'+timeForSlotPos(state,m.slotPos)+'</span>' +
+          '<span class="side home">'+esc(teamName(state,m.home))+'</span>'+scorePart+'<span class="side">'+esc(teamName(state,m.away))+'</span>'+detailToggle+'</div>';
+        var detailPanel = (editable && uiState.expandedMatches[m.__idx]) ? renderMatchDetail(state,m,m.__idx) : '';
+        return editable ? ('<div class="match-row-wrap">'+matchRow+detailPanel+'</div>') : matchRow;
+      }).join('');
+      html += '<div class="day-group"><div class="day-head"><span class="d1">'+DAYS_TR[date.getDay()]+'</span><span class="d2">'+fmtDateShort(date)+'</span></div>'+rows+'</div>';
+    }
+    return '<div class="stage" style="margin-top:12px">'+html+'</div>';
+  }
+
+  function renderOzet(state){
+    if (!state.drawnAt) return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel note">Takım özeti, kura çekildikten sonra burada görünecek.</div></div>';
+    var teams = state.teams.slice().sort(function(a,b){ return a.name.localeCompare(b.name,"tr"); });
+    if (uiState.selectedTeamId==null || !teams.some(function(t){ return t.id===uiState.selectedTeamId; })) uiState.selectedTeamId = teams.length?teams[0].id:null;
+    var options = teams.map(function(t){ return '<option value="'+esc(t.id)+'"'+(t.id===uiState.selectedTeamId?' selected':'')+'>'+esc(t.name)+'</option>'; }).join('');
+    var picker = '<div class="panel"><div class="section-head"><h2>Takım Özeti</h2></div><div class="ozet-picker" style="margin-top:10px"><select id="ozetTeamSelect">'+options+'</select></div></div>';
+    var body = '';
+    if (uiState.selectedTeamId){
+      var selId = uiState.selectedTeamId, cal = calendar(state);
+      var rows = state.matches.filter(function(m){ return m.home===selId||m.away===selId; }).slice()
+        .sort(function(a,b){ return (a.dayIndex-b.dayIndex)||(a.slotPos-b.slotPos); }).map(function(m){
+          var isHome = m.home===selId, oppId = isHome?m.away:m.home, date = cal[m.dayIndex], played = m.hs!=null&&m.as!=null;
+          var scorePart = played ? ('<span class="score-static">'+(isHome?m.hs:m.as)+' : '+(isHome?m.as:m.hs)+'</span>') : '<span class="score-static">vs</span>';
+          return '<div class="match-row"><span class="tag">'+m.round+'. HAFTA</span><span class="tag time mono">'+fmtDateShort(date)+'</span><span class="tag time mono">'+timeForSlotPos(state,m.slotPos)+'</span><span class="side">'+esc(teamName(state,oppId))+'</span>'+scorePart+'</div>';
+        }).join('');
+      body = '<div class="panel"><div class="section-head"><h2>'+esc(teamName(state,selId))+'</h2></div><div class="stage" style="margin-top:12px;gap:8px">'+(rows||'<span class="note">Maç bulunamadı.</span>')+'</div></div>';
+    }
+    return '<div class="stage">'+renderSummaryStrip(state)+picker+body+'</div>';
+  }
+
+  function renderPuanDurumu(state){
+    if (!state.drawnAt) return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel note">Puan durumu, kura çekildikten sonra burada görünecek.</div></div>';
+    var rows = computeStandings(state);
+    var body = rows.map(function(r,i){
+      var divider = (i===8 && rows.length>8) ? '<tr class="po-divider"><td colspan="10"><span class="po-divider-line">Playoff hattı — ilk 8 sıra</span></td></tr>' : '';
+      return divider + '<tr'+(i<8?' class="po-qualify"':'')+'><td>'+(i+1)+'</td><td class="team-cell">'+esc(r.name)+'</td><td>'+r.played+'</td><td>'+r.won+'</td><td>'+r.draw+'</td><td>'+r.lost+'</td><td>'+r.gf+'</td><td>'+r.ga+'</td><td>'+(r.avg>0?'+':'')+r.avg+'</td><td class="pts">'+r.pts+'</td></tr>';
+    }).join('');
+    var table = '<div class="panel" style="overflow-x:auto"><table class="standings-table"><thead><tr><th></th><th>Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>A</th><th>Y</th><th>AV</th><th>P</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+    return '<div class="stage">'+renderSummaryStrip(state)+table+'</div>';
+  }
+
+  function renderPlayoffMatchRow(state, m, ref, homeLabel, awayLabel, editable, extraClass){
+    var known = !!(m && m.home!=null && m.away!=null);
+    var played = known && m.hs!=null && m.as!=null;
+    var scorePart;
+    if (editable && known){
+      scorePart = '<span class="score"><input type="number" min="0" max="99" data-match-idx="'+ref+'" data-side="h" value="'+(m.hs==null?'':m.hs)+'"><span class="sep">:</span><input type="number" min="0" max="99" data-match-idx="'+ref+'" data-side="a" value="'+(m.as==null?'':m.as)+'"></span>';
+    } else {
+      scorePart = '<span class="score-static">'+(played?(m.hs+' : '+m.as):(known?'vs':'—'))+'</span>';
+    }
+    var detailToggle = (editable && known) ? '<button class="btn btn-ghost detail-toggle-btn" data-action="toggle-detail" data-match-idx="'+ref+'">'+(uiState.expandedMatches[ref]?'Kapat':'Gol / Kart')+'</button>' : '';
+    var row = '<div class="po-match'+(known?'':' pending')+(extraClass?(' '+extraClass):'')+'"><span class="side home'+(known?'':' tbd')+'">'+esc(homeLabel)+'</span>'+scorePart+'<span class="side'+(known?'':' tbd')+'">'+esc(awayLabel)+'</span>'+detailToggle+'</div>';
+    var detailPanel = (editable && known && uiState.expandedMatches[ref]) ? renderMatchDetail(state,m,ref) : '';
+    return editable ? ('<div class="match-row-wrap">'+row+detailPanel+'</div>') : row;
+  }
+  function renderPlayoffBracket(state, editable){
+    var p = state.playoff, active = !!(p && p.active);
+    function seedLabel(n){ return n+". Sıra"; }
+    function labelFor(teamId, fallback){ return teamId!=null ? teamName(state,teamId) : fallback; }
+    var qfPairs = [[1,8],[4,5],[2,7],[3,6]];
+    var qfRows = qfPairs.map(function(pair,i){
+      var m = active ? p.qf[i] : null;
+      var homeLabel = active ? labelFor(m.home, seedLabel(pair[0])) : seedLabel(pair[0]);
+      var awayLabel = active ? labelFor(m.away, seedLabel(pair[1])) : seedLabel(pair[1]);
+      return renderPlayoffMatchRow(state, m, "playoff:qf:"+i, homeLabel, awayLabel, editable);
+    }).join('');
+    var sfFallbacks = [["1. Çeyrek Final galibi","2. Çeyrek Final galibi"],["3. Çeyrek Final galibi","4. Çeyrek Final galibi"]];
+    var sfRows = [0,1].map(function(i){
+      var m = active ? p.sf[i] : null;
+      var homeLabel = active ? labelFor(m.home, sfFallbacks[i][0]) : sfFallbacks[i][0];
+      var awayLabel = active ? labelFor(m.away, sfFallbacks[i][1]) : sfFallbacks[i][1];
+      return renderPlayoffMatchRow(state, m, "playoff:sf:"+i, homeLabel, awayLabel, editable);
+    }).join('');
+    var finalM = active ? p.final : null;
+    var finalHome = active ? labelFor(finalM.home,"1. Yarı Final galibi") : "1. Yarı Final galibi";
+    var finalAway = active ? labelFor(finalM.away,"2. Yarı Final galibi") : "2. Yarı Final galibi";
+    var finalRow = renderPlayoffMatchRow(state, finalM, "playoff:final", finalHome, finalAway, editable, "po-final");
+    var thirdM = active ? p.third : null;
+    var thirdHome = active ? labelFor(thirdM.home,"1. Yarı Final kaybedeni") : "1. Yarı Final kaybedeni";
+    var thirdAway = active ? labelFor(thirdM.away,"2. Yarı Final kaybedeni") : "2. Yarı Final kaybedeni";
+    var thirdRow = renderPlayoffMatchRow(state, thirdM, "playoff:third", thirdHome, thirdAway, editable);
+    return '<div class="po-bracket">' +
+      '<div class="po-round"><div class="po-round-label">Çeyrek Final</div>'+qfRows+'</div>' +
+      '<div class="po-round"><div class="po-round-label">Yarı Final</div>'+sfRows+'</div>' +
+      '<div class="po-round"><div class="po-round-label">Final</div>'+finalRow+'</div>' +
+      '<div class="po-round"><div class="po-third-label">3.lük Maçı</div>'+thirdRow+'</div>' +
+    '</div>';
+  }
+  function renderPlayoff(state){
+    if (!state.drawnAt) return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel note">Play-Off, kura çekildikten sonra burada görünecek.</div></div>';
+    var bracket = '<div class="panel" style="overflow-x:auto">'+renderPlayoffBracket(state,false)+'</div>';
+    return '<div class="stage">'+renderSummaryStrip(state)+bracket+'</div>';
+  }
+
+  function renderGolKrallik(state){
+    if (!state.drawnAt) return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel note">Gol krallığı, kura çekildikten sonra burada görünecek.</div></div>';
+    var rows = computeTopScorers(state);
+    var list = rows.map(function(r,i){
+      return '<div class="leader-row"><span class="leader-rank">'+(i+1)+'</span><span class="leader-name">'+esc(r.name)+'</span><span class="leader-team">'+esc(r.teamName)+'</span><span class="leader-count">'+r.goals+'</span></div>';
+    }).join('');
+    return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel"><div class="section-head"><h2>Gol Krallığı</h2></div><div class="stage" style="margin-top:12px;gap:6px">'+(list||'<span class="note">Henüz gol kaydı yok.</span>')+'</div></div></div>';
+  }
+  function renderKartlar(state){
+    if (!state.drawnAt) return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel note">Kartlar, kura çekildikten sonra burada görünecek.</div></div>';
+    var totals = computeCardTotals(state), suspended = computeSuspensions(state);
+    function rowsFor(list){
+      return list.map(function(r){
+        var susp = suspended[r.playerId] ? '<span class="susp-badge">Sıradaki maç cezalı</span>' : '';
+        return '<div class="leader-row"><span class="leader-name">'+esc(r.name)+'</span><span class="leader-team">'+esc(r.teamName)+'</span><span class="leader-count">'+r.count+'</span>'+susp+'</div>';
+      }).join('') || '<span class="note">Henüz kayıt yok.</span>';
+    }
+    var yellowBlock = '<div class="panel"><div class="section-head"><h2><span class="card-icon card-icon-yellow"></span> Sarı Kartlar</h2></div><div class="stage" style="margin-top:12px;gap:6px">'+rowsFor(totals.yellow)+'</div></div>';
+    var redBlock = '<div class="panel"><div class="section-head"><h2><span class="card-icon card-icon-red"></span> Kırmızı Kartlar</h2></div><div class="stage" style="margin-top:12px;gap:6px">'+rowsFor(totals.red)+'</div></div>';
+    var rule = '<div class="panel note">Kural: doğrudan kırmızı kart gören bir sonraki maçında oynayamaz. Farklı maçlarda toplam 2 sarı kart gören de bir sonraki maçında cezalı olur. Bu kural şimdilik sadece lig evresi maçlarını kapsıyor.</div>';
+    return '<div class="stage">'+renderSummaryStrip(state)+rule+yellowBlock+redBlock+'</div>';
+  }
+
+  function render(){
+    document.querySelectorAll(".tab-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.tab===uiTab); });
+    var renderers = { admin:renderAdmin, ozet:renderOzet, puan:renderPuanDurumu, playoff:renderPlayoff, krallik:renderGolKrallik, kartlar:renderKartlar };
+    var fn = renderers[uiTab] || renderAdmin;
+    document.getElementById("content").innerHTML = fn(state);
+  }
+
+  // ---- events ----
+  document.getElementById("tabs").addEventListener("click", function(e){
+    var btn = e.target.closest(".tab-btn");
+    if (!btn) return;
+    uiTab = btn.dataset.tab;
+    render();
+  });
+
+  document.getElementById("content").addEventListener("click", function(e){
+    if (e.target.id==="addTeamBtn"){ addTeamFromInput(); return; }
+    if (e.target.id==="addPlayerBtn"){ addPlayerFromInput(); return; }
+    if (e.target.dataset.removeTeam){ removeTeam(e.target.dataset.removeTeam); return; }
+    if (e.target.dataset.removePlayer){ var rp=e.target.dataset.removePlayer.split(":"); removePlayer(rp[0],rp[1]); return; }
+    if (e.target.dataset.removeEvent){ var re=e.target.dataset.removeEvent.split("||"); removeMatchEvent(re[0], parseInt(re[1],10)); return; }
+    var btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    var action = btn.dataset.action;
+    if (action==="draw") startDraw();
+    else if (action==="bulk-add") addTeamsFromBulk();
+    else if (action==="bulk-add-player") addPlayersFromBulk();
+    else if (action==="reset-ask"){ uiState.confirmReset=true; render(); }
+    else if (action==="reset-cancel"){ uiState.confirmReset=false; render(); }
+    else if (action==="reset-execute") doReset();
+    else if (action==="download") downloadFixture();
+    else if (action==="reschedule-days") rescheduleDaysManually();
+    else if (action==="toggle-detail") toggleMatchDetail(btn.dataset.matchIdx);
+    else if (action==="add-event"){ var sel=document.getElementById(btn.dataset.target); if (sel && sel.value) addMatchEvent(btn.dataset.matchIdx, btn.dataset.eventType, sel.value); }
+    else if (action==="activate-playoff") activatePlayoff();
+    else if (action==="reset-playoff-ask"){ uiState.confirmPlayoffReset=true; render(); }
+    else if (action==="reset-playoff-cancel"){ uiState.confirmPlayoffReset=false; render(); }
+    else if (action==="reset-playoff-execute") resetPlayoffExecute();
+    else if (action==="wipe-all-ask"){ uiState.confirmWipeAll=true; render(); }
+    else if (action==="wipe-all-cancel"){ uiState.confirmWipeAll=false; render(); }
+    else if (action==="wipe-all-execute") wipeAllExecute();
+  });
+
+  document.getElementById("content").addEventListener("keydown", function(e){
+    if (e.key==="Enter" && e.target.id==="newTeamName"){ e.preventDefault(); addTeamFromInput(); }
+    if (e.key==="Enter" && e.target.id==="newPlayerName"){ e.preventDefault(); addPlayerFromInput(); }
+  });
+
+  document.getElementById("content").addEventListener("change", function(e){
+    var t = e.target;
+    if (t.id==="startDateInput"){ updateStartDate(t.value); return; }
+    if (t.id==="slot1Input"){ updateSetting("slot1Time", t.value||"17:00"); return; }
+    if (t.id==="slot2Input"){ updateSetting("slot2Time", t.value||"18:00"); return; }
+    if (t.id==="slot3Input"){ updateSetting("slot3Time", t.value||"19:00"); return; }
+    if (t.id==="thirdMatchToggle"){ updateMatchesPerDay(t.checked?3:2); return; }
+    if (t.id==="roundsInput"){ updateSetting("rounds", Math.max(1, parseInt(t.value,10)||1)); return; }
+    if (t.matches("input[data-match-idx]")){ updateScore(t.dataset.matchIdx, t.dataset.side, t.value); return; }
+    if (t.id==="ozetTeamSelect"){ uiState.selectedTeamId=t.value; render(); return; }
+    if (t.id==="rosterTeamSelect"){ uiState.rosterTeamId=t.value; render(); return; }
+  });
+
+  // ---- boot ----
+  if (isAdminUnlocked()){ showApp(); connect(); }
+  else { showGate(); }
+})();
+</script>
+</body>
+</html>
