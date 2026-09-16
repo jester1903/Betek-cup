@@ -92,15 +92,34 @@
   .card-icon-yellow{ background:#E8B923; }
   .card-icon-red{ background:#C4402C; }
 
+  /* Stacked list by default (kept for phone widths — a sideways-scrolling
+     tree is a poor fit there); becomes a real connected bracket tree once
+     there's room, see the min-width:640px block below. */
   .po-bracket{ display:flex; flex-direction:column; gap:16px; }
   .po-round-label{ font-family:var(--font-mono); font-size:9.5px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
   .po-round{ display:flex; flex-direction:column; gap:6px; }
-  .po-match{ display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:7px; padding:8px 10px; }
+  .po-col{ display:flex; flex-direction:column; gap:6px; }
+  .po-pair{ display:flex; flex-direction:column; gap:6px; }
+  .po-match{ display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:7px; padding:8px 10px; position:relative; z-index:1; }
   .po-match .side{ flex:1; min-width:0; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .po-match .side.home{ text-align:right; }
   .po-match .side.tbd{ color:var(--ink-muted); font-style:italic; }
   .po-final{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
-  .po-third-label{ font-size:11px; color:var(--ink-muted); margin-bottom:4px; }
+  .po-third-wrap{ margin-top:16px; }
+  .po-third-label{ font-family:var(--font-mono); font-size:9.5px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+  @media (min-width:640px){
+    .po-bracket{ flex-direction:row; align-items:stretch; gap:28px; }
+    .po-round{ min-width:190px; }
+    .po-round:nth-child(2),.po-round:nth-child(3){ min-width:210px; }
+    .po-round-final{ justify-content:center; }
+    .po-col{ justify-content:space-around; flex:1; gap:12px; }
+    .po-pair{ justify-content:space-around; gap:12px; position:relative; }
+    .po-round:not(.po-round-final) .po-pair::after{
+      content:""; position:absolute; top:25%; bottom:25%; left:100%; width:28px;
+      border:1.5px solid var(--border); border-left:none; border-radius:0 8px 8px 0; pointer-events:none;
+    }
+    .po-third-wrap{ max-width:280px; }
+  }
 
   .empty-state{ padding:30px 10px; text-align:center; color:var(--ink-muted); font-size:13.5px; }
 
@@ -313,6 +332,27 @@
   }
 
   // ---- connection (read-only: select + realtime subscribe, never write) ----
+  // Live updates use two mechanisms at once: Supabase realtime (instant,
+  // pushed over a websocket) and a plain REST poll (a fetch every couple of
+  // seconds, works everywhere). Realtime is blocked outright on some
+  // corporate/school networks (proxies that don't allow the websocket
+  // upgrade) — on those it just silently never fires, so the poll is the
+  // one guaranteed way this page stays live, and it runs fast while a draw
+  // ceremony is in progress and slower otherwise.
+  var pollTimer = null;
+  function schedulePoll(){
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = setTimeout(pollOnce, state.draw ? 1800 : 12000);
+  }
+  function pollOnce(){
+    if (!supabaseClient){ schedulePoll(); return; }
+    supabaseClient.from("turnuva_state").select("data").eq("id","main").maybeSingle().then(function(r){
+      if (r && !r.error && r.data && r.data.data){
+        state = normalizeState(r.data.data);
+        render();
+      }
+    }).catch(function(){}).then(function(){ schedulePoll(); });
+  }
   function connect(){
     var cfg = getConfig();
     if (!cfg.url || !cfg.key){ renderSetup(); return; }
@@ -329,6 +369,7 @@
             render();
           })
           .subscribe();
+        schedulePoll();
       }).catch(function(e){
         document.getElementById("statusDot").classList.remove("ok");
       });
@@ -430,40 +471,46 @@
     var known = !!(m && m.home!=null && m.away!=null);
     var played = known && m.hs!=null && m.as!=null;
     var scorePart = '<span class="score-static">'+(played?(m.hs+' : '+m.as):(known?'vs':'—'))+'</span>';
-    return '<div class="po-match'+(known?'':' pending')+(extraClass?(' '+extraClass):'')+'"><span class="side home'+(known?'':' tbd')+'">'+esc(homeLabel)+'</span>'+scorePart+'<span class="side'+(known?'':' tbd')+'">'+esc(awayLabel)+'</span></div>';
+    return '<div class="po-match'+(known?'':' pending')+(extraClass?(' '+extraClass):'')+'"><span class="side home'+(known?'':' tbd')+'" title="'+esc(homeLabel)+'">'+esc(homeLabel)+'</span>'+scorePart+'<span class="side'+(known?'':' tbd')+'" title="'+esc(awayLabel)+'">'+esc(awayLabel)+'</span></div>';
   }
   function renderPlayoffBracket(state){
     var p = state.playoff, active = !!(p && p.active);
     function seedLabel(n){ return n+". Sıra"; }
     function labelFor(teamId, fallback){ return teamId!=null ? teamName(state,teamId) : fallback; }
     var qfPairs = [[1,8],[4,5],[2,7],[3,6]];
-    var qfRows = qfPairs.map(function(pair,i){
+    var qfMatches = qfPairs.map(function(pair,i){
       var m = active ? p.qf[i] : null;
       var homeLabel = active ? labelFor(m.home, seedLabel(pair[0])) : seedLabel(pair[0]);
       var awayLabel = active ? labelFor(m.away, seedLabel(pair[1])) : seedLabel(pair[1]);
       return renderPlayoffMatchRow(state, m, homeLabel, awayLabel);
-    }).join('');
+    });
+    var qfCol = '<div class="po-col">' +
+      '<div class="po-pair">'+qfMatches[0]+qfMatches[1]+'</div>' +
+      '<div class="po-pair">'+qfMatches[2]+qfMatches[3]+'</div>' +
+    '</div>';
     var sfFallbacks = [["1. Çeyrek Final galibi","2. Çeyrek Final galibi"],["3. Çeyrek Final galibi","4. Çeyrek Final galibi"]];
-    var sfRows = [0,1].map(function(i){
+    var sfMatches = [0,1].map(function(i){
       var m = active ? p.sf[i] : null;
       var homeLabel = active ? labelFor(m.home, sfFallbacks[i][0]) : sfFallbacks[i][0];
       var awayLabel = active ? labelFor(m.away, sfFallbacks[i][1]) : sfFallbacks[i][1];
       return renderPlayoffMatchRow(state, m, homeLabel, awayLabel);
-    }).join('');
+    });
+    var sfCol = '<div class="po-col"><div class="po-pair">'+sfMatches[0]+sfMatches[1]+'</div></div>';
     var finalM = active ? p.final : null;
     var finalHome = active ? labelFor(finalM.home,"1. Yarı Final galibi") : "1. Yarı Final galibi";
     var finalAway = active ? labelFor(finalM.away,"2. Yarı Final galibi") : "2. Yarı Final galibi";
     var finalRow = renderPlayoffMatchRow(state, finalM, finalHome, finalAway, "po-final");
+    var finalCol = '<div class="po-col">'+finalRow+'</div>';
     var thirdM = active ? p.third : null;
     var thirdHome = active ? labelFor(thirdM.home,"1. Yarı Final kaybedeni") : "1. Yarı Final kaybedeni";
     var thirdAway = active ? labelFor(thirdM.away,"2. Yarı Final kaybedeni") : "2. Yarı Final kaybedeni";
     var thirdRow = renderPlayoffMatchRow(state, thirdM, thirdHome, thirdAway);
     return '<div class="po-bracket">' +
-      '<div class="po-round"><div class="po-round-label">Çeyrek Final</div>'+qfRows+'</div>' +
-      '<div class="po-round"><div class="po-round-label">Yarı Final</div>'+sfRows+'</div>' +
-      '<div class="po-round"><div class="po-round-label">Final</div>'+finalRow+'</div>' +
-      '<div class="po-round"><div class="po-third-label">3.lük Maçı</div>'+thirdRow+'</div>' +
-    '</div>';
+      '<div class="po-round"><div class="po-round-label">Çeyrek Final</div>'+qfCol+'</div>' +
+      '<div class="po-round"><div class="po-round-label">Yarı Final</div>'+sfCol+'</div>' +
+      '<div class="po-round po-round-final"><div class="po-round-label">Final</div>'+finalCol+'</div>' +
+    '</div>' +
+    '<div class="po-third-wrap"><div class="po-third-label">3.lük Maçı</div>'+thirdRow+'</div>';
   }
   function renderPlayoff(state){
     if (!state.drawnAt || !state.playoff || !state.playoff.active) return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel empty-state">Play-Off henüz aktif değil.</div></div>';
