@@ -309,6 +309,24 @@
     function toSorted(bucket){ var rows=Object.keys(bucket).map(function(k){ return bucket[k]; }); rows.sort(function(a,b){ return (b.count-a.count)||a.name.localeCompare(b.name,"tr"); }); return rows; }
     return { yellow: toSorted(yellow), red: toSorted(red) };
   }
+  function computeTeamRosterStats(state, teamId){
+    var team = findTeam(state, teamId);
+    var tally = {};
+    (team && team.players || []).forEach(function(p){ tally[p.id] = { playerId:p.id, name:p.name, goals:0, yellow:0, red:0 }; });
+    allMatchesWithEvents(state).forEach(function(m){
+      (m.events||[]).forEach(function(ev){
+        if (ev.teamId!==teamId) return;
+        var row = tally[ev.playerId];
+        if (!row) return;
+        if (ev.type==="goal") row.goals++;
+        else if (ev.type==="yellow") row.yellow++;
+        else if (ev.type==="red") row.red++;
+      });
+    });
+    var rows = Object.keys(tally).map(function(k){ return tally[k]; });
+    rows.sort(function(a,b){ return a.name.localeCompare(b.name,"tr"); });
+    return rows;
+  }
   function computeSuspensions(state){
     var suspended = {}, byTeam = {};
     state.matches.forEach(function(m){ (byTeam[m.home]=byTeam[m.home]||[]).push(m); (byTeam[m.away]=byTeam[m.away]||[]).push(m); });
@@ -433,6 +451,14 @@
           return '<div class="match-row"><span class="tag">'+m.round+'. HAFTA</span><span class="tag time mono">'+fmtDateShort(date)+'</span><span class="tag time mono">'+timeForSlotPos(state,m.slotPos)+'</span><span class="side">'+esc(teamName(state,oppId))+'</span>'+scorePart+'</div>';
         }).join('');
       body = '<div class="panel"><div class="section-head"><h2>'+esc(teamName(state,selId))+'</h2></div><div class="stage" style="margin-top:12px;gap:8px">'+(rows||'<span class="note">Maç bulunamadı.</span>')+'</div></div>';
+      var roster = computeTeamRosterStats(state, selId);
+      var rosterRows = roster.map(function(r){
+        return '<tr><td class="team-cell">'+esc(r.name)+'</td><td>'+r.goals+'</td><td>'+r.yellow+'</td><td>'+r.red+'</td></tr>';
+      }).join('');
+      var rosterTable = roster.length
+        ? '<table class="standings-table"><thead><tr><th>Ad Soyad</th><th>Gol</th><th><span class="card-icon card-icon-yellow"></span></th><th><span class="card-icon card-icon-red"></span></th></tr></thead><tbody>'+rosterRows+'</tbody></table>'
+        : '<span class="note">Bu takımda henüz oyuncu eklenmedi.</span>';
+      body += '<div class="panel" style="overflow-x:auto"><div class="section-head"><h2>Kadro</h2></div><div style="margin-top:12px">'+rosterTable+'</div></div>';
     }
     return '<div class="stage">'+renderSummaryStrip(state)+picker+body+'</div>';
   }
