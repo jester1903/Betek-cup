@@ -174,10 +174,12 @@
   var DAYS_TR_SHORT = ["Paz","Pzt","Sal","Çar","Per","Cum","Cmt"];
   var MONTHS_TR = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
   var DEFAULT_START_DATE = "2026-10-05";
+  var PLAYOFF_QF_SF_GAP_DAYS = 1;
+  var DEFAULT_PLAYOFF_FINAL_GAP_DAYS = 2;
 
   function freshState(){
     return {
-      settings:{ startDate:DEFAULT_START_DATE, slot1Time:"17:00", slot2Time:"18:00", slot3Time:"19:00", matchesPerDay:2, rounds:4, blackoutRanges:[] },
+      settings:{ startDate:DEFAULT_START_DATE, slot1Time:"17:00", slot2Time:"18:00", slot3Time:"19:00", matchesPerDay:2, rounds:4, blackoutRanges:[], playoffFinalGapDays:DEFAULT_PLAYOFF_FINAL_GAP_DAYS, playoffSplitFinalThird:false },
       teams:[], matches:[], drawnAt:null, playoff:null, draw:null
     };
   }
@@ -211,6 +213,9 @@
       f.settings.matchesPerDay = (d.settings.matchesPerDay===3) ? 3 : 2;
       if (d.settings.rounds) f.settings.rounds = d.settings.rounds;
       f.settings.blackoutRanges = normalizeBlackoutRanges(d.settings.blackoutRanges);
+      var pfg = parseInt(d.settings.playoffFinalGapDays, 10);
+      f.settings.playoffFinalGapDays = (!isNaN(pfg) && pfg>=0) ? Math.min(10, pfg) : DEFAULT_PLAYOFF_FINAL_GAP_DAYS;
+      f.settings.playoffSplitFinalThird = !!d.settings.playoffSplitFinalThird;
     }
     if (Array.isArray(d.teams)) f.teams = d.teams.map(function(t){ return { id:t.id, name:t.name, players:Array.isArray(t.players)?t.players:[] }; });
     if (Array.isArray(d.matches)) f.matches = d.matches.map(function(m){
@@ -261,13 +266,35 @@
   function calendar(state){ return weekdayDates(state.settings.startDate, dayCount(state), state.settings.blackoutRanges); }
   // Same plan admin.html locks in once the bracket is activated — pure, only
   // reads state.matches/state.settings, so the schedule can be shown here
-  // even before the playoff matchups themselves are known.
+  // even before the playoff matchups themselves are known. Keep this in sync
+  // with admin.html's playoffSlotPlan (same two rest gaps: a fixed bye
+  // between QF and SF, an admin-configurable bye between SF and Third/Final).
   function playoffSlotPlan(state){
     var startDay = 0;
     state.matches.forEach(function(m){ if (m.dayIndex!=null && m.dayIndex+1>startDay) startDay=m.dayIndex+1; });
     var perDay = state.settings.matchesPerDay===3 ? 3 : 2;
+    var finalGap = (state.settings.playoffFinalGapDays!=null) ? state.settings.playoffFinalGapDays : DEFAULT_PLAYOFF_FINAL_GAP_DAYS;
+    var split = !!state.settings.playoffSplitFinalThird;
+
     var plan = [];
-    for (var i=0;i<8;i++){ plan.push({ dayIndex: startDay + Math.floor(i/perDay), slotPos: i % perDay }); }
+    var qfDays = Math.ceil(4/perDay);
+    for (var i=0;i<4;i++){ plan.push({ dayIndex: startDay + Math.floor(i/perDay), slotPos: i % perDay }); }
+    var sfStart = startDay + qfDays + PLAYOFF_QF_SF_GAP_DAYS;
+
+    var sfDays = Math.ceil(2/perDay);
+    for (i=0;i<2;i++){ plan.push({ dayIndex: sfStart + Math.floor(i/perDay), slotPos: i % perDay }); }
+    var finalStart = sfStart + sfDays + finalGap;
+
+    if (split){
+      plan.push({ dayIndex: finalStart, slotPos: 0 });
+      plan.push({ dayIndex: finalStart + 1, slotPos: 0 });
+    } else if (perDay>=2){
+      plan.push({ dayIndex: finalStart, slotPos: 0 });
+      plan.push({ dayIndex: finalStart, slotPos: 1 });
+    } else {
+      plan.push({ dayIndex: finalStart, slotPos: 0 });
+      plan.push({ dayIndex: finalStart + 1, slotPos: 0 });
+    }
     return plan;
   }
   function findTeam(state, teamId){ for (var i=0;i<state.teams.length;i++){ if (state.teams[i].id===teamId) return state.teams[i]; } return null; }
