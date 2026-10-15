@@ -101,7 +101,8 @@
   .po-col{ display:flex; flex-direction:column; gap:6px; }
   .po-pair{ display:flex; flex-direction:column; gap:6px; }
   .po-match-block{ position:relative; z-index:1; }
-  .po-match-date{ font-size:9px; color:var(--ink-muted); margin:0 2px 3px; text-align:center; }
+  .po-match-date{ font-size:11px; line-height:1.35; color:var(--ink-muted); margin:0 2px 4px; text-align:center; }
+  .po-match-date .po-match-day{ font-weight:600; }
   .po-match{ display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:7px; padding:8px 10px; position:relative; z-index:1; }
   .po-match .side{ flex:1; min-width:0; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .po-match .side.home{ text-align:right; }
@@ -233,6 +234,7 @@
   function fmtDateLong(d){ return DAYS_TR[d.getDay()]+", "+d.getDate()+" "+MONTHS_TR[d.getMonth()]+" "+d.getFullYear(); }
   function fmtDateShort(d){ return DAYS_TR_SHORT[d.getDay()]+" "+String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear(); }
   function fmtDateCompact(d){ return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0"); }
+  function fmtDateNumericFull(d){ return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear()+" "+DAYS_TR[d.getDay()]; }
   function timeForSlotPos(state, pos){ if (pos===0) return state.settings.slot1Time; if (pos===1) return state.settings.slot2Time; return state.settings.slot3Time||"19:00"; }
   function dayCount(state){
     var max=-1;
@@ -470,7 +472,7 @@
         .sort(function(a,b){ return (a.dayIndex-b.dayIndex)||(a.slotPos-b.slotPos); }).map(function(m){
           var isHome = m.home===selId, oppId = isHome?m.away:m.home, date = cal[m.dayIndex], played = m.hs!=null&&m.as!=null;
           var scorePart = played ? ('<span class="score-static">'+(isHome?m.hs:m.as)+' : '+(isHome?m.as:m.hs)+'</span>') : '<span class="score-static">vs</span>';
-          return '<div class="match-row"><span class="tag">'+m.round+'. HAFTA</span><span class="tag time mono">'+fmtDateShort(date)+'</span><span class="tag time mono">'+timeForSlotPos(state,m.slotPos)+'</span><span class="side">'+esc(teamName(state,oppId))+'</span>'+scorePart+'</div>';
+          return '<div class="match-row"><span class="tag">'+m.round+'. TUR</span><span class="tag time mono">'+fmtDateShort(date)+'</span><span class="tag time mono">'+timeForSlotPos(state,m.slotPos)+'</span><span class="side">'+esc(teamName(state,oppId))+'</span>'+scorePart+'</div>';
         }).join('');
       body = '<div class="panel"><div class="section-head"><h2>'+esc(teamName(state,selId))+'</h2></div><div class="stage" style="margin-top:12px;gap:8px">'+(rows||'<span class="note">Maç bulunamadı.</span>')+'</div></div>';
       var roster = computeTeamRosterStats(state, selId);
@@ -497,7 +499,7 @@
       var rows = groups[di].map(function(m){
         var played = m.hs!=null && m.as!=null;
         var scorePart = '<span class="score-static">'+(played?(m.hs+' : '+m.as):'vs')+'</span>';
-        return '<div class="match-row '+(played?'':'pending')+'"><span class="tag">'+m.round+'. HAFTA</span><span class="tag time mono">'+timeForSlotPos(state,m.slotPos)+'</span><span class="side home">'+esc(teamName(state,m.home))+'</span>'+scorePart+'<span class="side">'+esc(teamName(state,m.away))+'</span></div>';
+        return '<div class="match-row '+(played?'':'pending')+'"><span class="tag">'+m.round+'. TUR</span><span class="tag time mono">'+timeForSlotPos(state,m.slotPos)+'</span><span class="side home">'+esc(teamName(state,m.home))+'</span>'+scorePart+'<span class="side">'+esc(teamName(state,m.away))+'</span></div>';
       }).join('');
       html += '<div class="day-group"><div class="day-head"><span class="d1">'+DAYS_TR[date.getDay()]+'</span><span class="d2">'+fmtDateShort(date)+'</span></div>'+rows+'</div>';
     }
@@ -519,7 +521,7 @@
     var known = !!(m && m.home!=null && m.away!=null);
     var played = known && m.hs!=null && m.as!=null;
     var scorePart = '<span class="score-static">'+(played?(m.hs+' : '+m.as):(known?'vs':'—'))+'</span>';
-    var dateTag = (m && m.dayIndex!=null && cal && cal[m.dayIndex]) ? ('<div class="po-match-date mono">'+fmtDateCompact(cal[m.dayIndex])+' · '+timeForSlotPos(state,m.slotPos)+'</div>') : '';
+    var dateTag = (m && m.dayIndex!=null && cal && cal[m.dayIndex]) ? ('<div class="po-match-date"><span class="po-match-day mono">'+fmtDateNumericFull(cal[m.dayIndex])+'</span> - saat <span class="mono">'+timeForSlotPos(state,m.slotPos)+'</span></div>') : '';
     var row = '<div class="po-match'+(known?'':' pending')+(extraClass?(' '+extraClass):'')+'"><span class="side home'+(known?'':' tbd')+'" title="'+esc(homeLabel)+'">'+esc(homeLabel)+'</span>'+scorePart+'<span class="side'+(known?'':' tbd')+'" title="'+esc(awayLabel)+'">'+esc(awayLabel)+'</span></div>';
     return '<div class="po-match-block">'+dateTag+row+'</div>';
   }
@@ -552,12 +554,12 @@
       return renderPlayoffMatchRow(state, m, homeLabel, awayLabel, null, cal);
     });
     var sfCol = '<div class="po-col"><div class="po-pair">'+sfMatches[0]+sfMatches[1]+'</div></div>';
-    var finalM = active ? p.final : previewSlot(6);
+    var finalM = active ? p.final : previewSlot(7);
     var finalHome = active ? labelFor(finalM.home,"1. Yarı Final galibi") : "1. Yarı Final galibi";
     var finalAway = active ? labelFor(finalM.away,"2. Yarı Final galibi") : "2. Yarı Final galibi";
     var finalRow = renderPlayoffMatchRow(state, finalM, finalHome, finalAway, "po-final", cal);
     var finalCol = '<div class="po-col">'+finalRow+'</div>';
-    var thirdM = active ? p.third : previewSlot(7);
+    var thirdM = active ? p.third : previewSlot(6);
     var thirdHome = active ? labelFor(thirdM.home,"1. Yarı Final kaybedeni") : "1. Yarı Final kaybedeni";
     var thirdAway = active ? labelFor(thirdM.away,"2. Yarı Final kaybedeni") : "2. Yarı Final kaybedeni";
     var thirdRow = renderPlayoffMatchRow(state, thirdM, thirdHome, thirdAway, null, cal);
@@ -601,7 +603,7 @@
   function renderDrawCeremony(state){
     var d = state.draw;
     if (d.phase==="intro"){
-      return '<div class="stage"><div class="ceremony-stage"><div class="ceremony-round-title ceremony-reveal">'+d.round+'. HAFTA</div></div></div>';
+      return '<div class="stage"><div class="ceremony-stage"><div class="ceremony-round-title ceremony-reveal">'+d.round+'. TUR</div></div></div>';
     }
     var spotlightBlock = "";
     if (d.phase==="revealing" && d.spotlightIdx!=null){
@@ -614,10 +616,10 @@
     }).join('');
     var listBlock = rows ? ('<div class="day-group" style="margin-top:14px">'+rows+'</div>') : '';
     var note = d.phase==="round-done"
-      ? '<p class="note" style="margin-top:8px">'+d.round+'. hafta tamamlandı — yönetici bir sonraki haftayı başlatacak.</p>'
+      ? '<p class="note" style="margin-top:8px">'+d.round+'. tur tamamlandı — yönetici bir sonraki turu başlatacak.</p>'
       : '';
     return '<div class="stage" id="ceremonyStage">' +
-      '<div class="panel"><div class="section-head"><h2>'+d.round+'. Hafta Kurası'+(d.phase==="round-done"?" — tamamlandı":" — çekiliyor")+'</h2></div>' +
+      '<div class="panel"><div class="section-head"><h2>'+d.round+'. Tur Kurası'+(d.phase==="round-done"?" — tamamlandı":" — çekiliyor")+'</h2></div>' +
         spotlightBlock + note +
       '</div>' + listBlock +
     '</div>';

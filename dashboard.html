@@ -323,7 +323,7 @@ function renderFixturesSlide(){
   var cards = list.map(function(x){
     var m = x.m, played = m.hs!=null && m.as!=null;
     var scoreHtml = played ? (m.hs+" : "+m.as) : "vs";
-    var tag = m.round+". Hafta · "+(x.dateObj?fmtDateShort(x.dateObj):"")+" · "+timeForSlotPos(m.slotPos);
+    var tag = m.round+". Tur · "+(x.dateObj?fmtDateShort(x.dateObj):"")+" · "+timeForSlotPos(m.slotPos);
     return '<div class="match-card"><span class="tag">'+tag+'</span><div class="pair"><span class="t">'+esc(teamName(m.home))+'</span><span class="score">'+scoreHtml+'</span><span class="t">'+esc(teamName(m.away))+'</span></div></div>';
   }).join('');
 
@@ -332,7 +332,7 @@ function renderFixturesSlide(){
     recentHtml = '<div class="slide-title" style="padding-top:6px"><h2 style="font-size:20px">Son Sonuçlar</h2></div><div class="match-grid">' +
       recent.map(function(x){
         var m = x.m;
-        return '<div class="match-card"><span class="tag">'+m.round+'. Hafta · '+(x.dateObj?fmtDateShort(x.dateObj):"")+'</span><div class="pair"><span class="t">'+esc(teamName(m.home))+'</span><span class="score">'+m.hs+' : '+m.as+'</span><span class="t">'+esc(teamName(m.away))+'</span></div></div>';
+        return '<div class="match-card"><span class="tag">'+m.round+'. Tur · '+(x.dateObj?fmtDateShort(x.dateObj):"")+'</span><div class="pair"><span class="t">'+esc(teamName(m.home))+'</span><span class="score">'+m.hs+' : '+m.as+'</span><span class="t">'+esc(teamName(m.away))+'</span></div></div>';
       }).join('') + '</div>';
   }
 
