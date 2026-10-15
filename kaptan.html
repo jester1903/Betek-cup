@@ -312,7 +312,7 @@
   function computeTeamRosterStats(state, teamId){
     var team = findTeam(state, teamId);
     var tally = {};
-    (team && team.players || []).forEach(function(p){ tally[p.id] = { playerId:p.id, name:p.name, goals:0, yellow:0, red:0 }; });
+    (team && team.players || []).forEach(function(p){ tally[p.id] = { playerId:p.id, name:p.name, number:p.number||"", goals:0, yellow:0, red:0 }; });
     allMatchesWithEvents(state).forEach(function(m){
       (m.events||[]).forEach(function(ev){
         if (ev.teamId!==teamId) return;
@@ -453,10 +453,10 @@
       body = '<div class="panel"><div class="section-head"><h2>'+esc(teamName(state,selId))+'</h2></div><div class="stage" style="margin-top:12px;gap:8px">'+(rows||'<span class="note">Maç bulunamadı.</span>')+'</div></div>';
       var roster = computeTeamRosterStats(state, selId);
       var rosterRows = roster.map(function(r){
-        return '<tr><td class="team-cell">'+esc(r.name)+'</td><td>'+r.goals+'</td><td>'+r.yellow+'</td><td>'+r.red+'</td></tr>';
+        return '<tr><td class="mono">'+esc(r.number||"")+'</td><td class="team-cell">'+esc(r.name)+'</td><td>'+r.goals+'</td><td>'+r.yellow+'</td><td>'+r.red+'</td></tr>';
       }).join('');
       var rosterTable = roster.length
-        ? '<table class="standings-table"><thead><tr><th>Ad Soyad</th><th>Gol</th><th><span class="card-icon card-icon-yellow"></span></th><th><span class="card-icon card-icon-red"></span></th></tr></thead><tbody>'+rosterRows+'</tbody></table>'
+        ? '<table class="standings-table"><thead><tr><th>No</th><th>Ad Soyad</th><th>Gol</th><th><span class="card-icon card-icon-yellow"></span></th><th><span class="card-icon card-icon-red"></span></th></tr></thead><tbody>'+rosterRows+'</tbody></table>'
         : '<span class="note">Bu takımda henüz oyuncu eklenmedi.</span>';
       body += '<div class="panel" style="overflow-x:auto"><div class="section-head"><h2>Kadro</h2></div><div style="margin-top:12px">'+rosterTable+'</div></div>';
     }
