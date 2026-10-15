@@ -140,9 +140,15 @@ function setConfig(url,key){
 // ---- state (aynı JSON şekli admin.html ile) ----
 function freshState(){
   return {
-    settings:{ startDate:DEFAULT_START_DATE, slot1Time:"17:00", slot2Time:"18:00", slot3Time:"19:00", matchesPerDay:2, rounds:4 },
+    settings:{ startDate:DEFAULT_START_DATE, slot1Time:"17:00", slot2Time:"18:00", slot3Time:"19:00", matchesPerDay:2, rounds:4, blackoutRanges:[] },
     teams:[], matches:[], drawnAt:null, playoff:null
   };
+}
+function normalizeBlackoutRanges(arr){
+  if (!Array.isArray(arr)) return [];
+  var re = /^\d{4}-\d{2}-\d{2}$/;
+  return arr.filter(function(r){ return r && re.test(r.start) && re.test(r.end) && r.start<=r.end; })
+    .map(function(r){ return { start:r.start, end:r.end }; });
 }
 function normalizePlayoffMatch(m){
   if (!m) return { home:null, away:null, hs:null, as:null, events:[] };
@@ -167,6 +173,7 @@ function normalizeState(d){
     if (d.settings.slot3Time) f.settings.slot3Time = d.settings.slot3Time;
     f.settings.matchesPerDay = (d.settings.matchesPerDay===3) ? 3 : 2;
     if (d.settings.rounds) f.settings.rounds = d.settings.rounds;
+    f.settings.blackoutRanges = normalizeBlackoutRanges(d.settings.blackoutRanges);
   }
   if (Array.isArray(d.teams)) f.teams = d.teams.map(function(t){ return { id:t.id, name:t.name, players:Array.isArray(t.players)?t.players:[] }; });
   if (Array.isArray(d.matches)) f.matches = d.matches.map(function(m){
@@ -186,14 +193,19 @@ function teamName(id){ if (id==null) return null; var t=findTeam(id); return t ?
 function playerName(teamId, playerId){ var team=findTeam(teamId); if (!team||!Array.isArray(team.players)) return "?"; for (var i=0;i<team.players.length;i++){ if (team.players[i].id===playerId) return team.players[i].name; } return "?"; }
 function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
-// ---- takvim / gün-tarih eşlemesi (admin.html ile aynı mantık: hafta sonu yok) ----
-function weekdayDates(startISO, count){
+// ---- takvim / gün-tarih eşlemesi (admin.html ile aynı mantık: hafta sonu yok, kapsam dışı tarih aralıkları da atlanır) ----
+function isDateInRanges(iso, ranges){
+  if (!ranges) return false;
+  for (var i=0;i<ranges.length;i++){ var r=ranges[i]; if (r && r.start && r.end && iso>=r.start && iso<=r.end) return true; }
+  return false;
+}
+function weekdayDates(startISO, count, blackoutRanges){
   var dates = [], d = new Date(startISO+"T00:00:00");
-  while (dates.length < count){ var day=d.getDay(); if (day!==0 && day!==6) dates.push(new Date(d)); d=new Date(d); d.setDate(d.getDate()+1); }
+  while (dates.length < count){ var day=d.getDay(); if (day!==0 && day!==6 && !isDateInRanges(isoOf(d), blackoutRanges)) dates.push(new Date(d)); d=new Date(d); d.setDate(d.getDate()+1); }
   return dates;
 }
 function dayCount(){ if (!state.matches.length) return 0; var max=0; state.matches.forEach(function(m){ if (m.dayIndex>max) max=m.dayIndex; }); return max+1; }
-function calendar(){ return weekdayDates(state.settings.startDate, dayCount()); }
+function calendar(){ return weekdayDates(state.settings.startDate, dayCount(), state.settings.blackoutRanges); }
 function fmtDateShort(d){ return DAYS_TR_SHORT[d.getDay()]+" "+pad2(d.getDate())+"."+pad2(d.getMonth()+1); }
 function isoOf(d){ return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
 function timeForSlotPos(pos){ if (pos===0) return state.settings.slot1Time; if (pos===1) return state.settings.slot2Time; return state.settings.slot3Time||"19:00"; }
