@@ -100,6 +100,8 @@
   .po-round{ display:flex; flex-direction:column; gap:6px; }
   .po-col{ display:flex; flex-direction:column; gap:6px; }
   .po-pair{ display:flex; flex-direction:column; gap:6px; }
+  .po-match-block{ position:relative; z-index:1; }
+  .po-match-date{ font-size:9px; color:var(--ink-muted); margin:0 2px 3px; text-align:center; }
   .po-match{ display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:7px; padding:8px 10px; position:relative; z-index:1; }
   .po-match .side{ flex:1; min-width:0; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .po-match .side.home{ text-align:right; }
@@ -179,8 +181,8 @@
     };
   }
   function normalizePlayoffMatch(m){
-    if (!m) return { home:null, away:null, hs:null, as:null, events:[] };
-    return { home:m.home===undefined?null:m.home, away:m.away===undefined?null:m.away, hs:m.hs===undefined?null:m.hs, as:m.as===undefined?null:m.as, events:Array.isArray(m.events)?m.events:[] };
+    if (!m) return { home:null, away:null, hs:null, as:null, events:[], dayIndex:null, slotPos:null };
+    return { home:m.home===undefined?null:m.home, away:m.away===undefined?null:m.away, hs:m.hs===undefined?null:m.hs, as:m.as===undefined?null:m.as, events:Array.isArray(m.events)?m.events:[], dayIndex:(m.dayIndex==null?null:m.dayIndex), slotPos:(m.slotPos==null?null:m.slotPos) };
   }
   function normalizePlayoff(d){
     if (!d || !d.active) return null;
@@ -230,9 +232,29 @@
   }
   function fmtDateLong(d){ return DAYS_TR[d.getDay()]+", "+d.getDate()+" "+MONTHS_TR[d.getMonth()]+" "+d.getFullYear(); }
   function fmtDateShort(d){ return DAYS_TR_SHORT[d.getDay()]+" "+String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear(); }
+  function fmtDateCompact(d){ return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0"); }
   function timeForSlotPos(state, pos){ if (pos===0) return state.settings.slot1Time; if (pos===1) return state.settings.slot2Time; return state.settings.slot3Time||"19:00"; }
-  function dayCount(state){ if (!state.matches.length) return 0; var max=0; state.matches.forEach(function(m){ if (m.dayIndex>max) max=m.dayIndex; }); return max+1; }
+  function dayCount(state){
+    var max=-1;
+    state.matches.forEach(function(m){ if (m.dayIndex>max) max=m.dayIndex; });
+    var p = state.playoff;
+    if (p && p.active){
+      [].concat(p.qf||[], p.sf||[], [p.final, p.third]).forEach(function(m){ if (m && m.dayIndex!=null && m.dayIndex>max) max=m.dayIndex; });
+    }
+    return max+1;
+  }
   function calendar(state){ return weekdayDates(state.settings.startDate, dayCount(state)); }
+  // Same plan admin.html locks in once the bracket is activated — pure, only
+  // reads state.matches/state.settings, so the schedule can be shown here
+  // even before the playoff matchups themselves are known.
+  function playoffSlotPlan(state){
+    var startDay = 0;
+    state.matches.forEach(function(m){ if (m.dayIndex!=null && m.dayIndex+1>startDay) startDay=m.dayIndex+1; });
+    var perDay = state.settings.matchesPerDay===3 ? 3 : 2;
+    var plan = [];
+    for (var i=0;i<8;i++){ plan.push({ dayIndex: startDay + Math.floor(i/perDay), slotPos: i % perDay }); }
+    return plan;
+  }
   function findTeam(state, teamId){ for (var i=0;i<state.teams.length;i++){ if (state.teams[i].id===teamId) return state.teams[i]; } return null; }
   function teamName(state, id){ if (id==null) return null; var t=findTeam(state,id); return t?t.name:"?"; }
   function playerName(state, teamId, playerId){ var team=findTeam(state,teamId); if (!team||!Array.isArray(team.players)) return "?"; for (var i=0;i<team.players.length;i++){ if (team.players[i].id===playerId) return team.players[i].name; } return "?"; }
@@ -493,22 +515,30 @@
     return '<div class="stage">'+renderSummaryStrip(state)+table+'</div>';
   }
 
-  function renderPlayoffMatchRow(state, m, homeLabel, awayLabel, extraClass){
+  function renderPlayoffMatchRow(state, m, homeLabel, awayLabel, extraClass, cal){
     var known = !!(m && m.home!=null && m.away!=null);
     var played = known && m.hs!=null && m.as!=null;
     var scorePart = '<span class="score-static">'+(played?(m.hs+' : '+m.as):(known?'vs':'—'))+'</span>';
-    return '<div class="po-match'+(known?'':' pending')+(extraClass?(' '+extraClass):'')+'"><span class="side home'+(known?'':' tbd')+'" title="'+esc(homeLabel)+'">'+esc(homeLabel)+'</span>'+scorePart+'<span class="side'+(known?'':' tbd')+'" title="'+esc(awayLabel)+'">'+esc(awayLabel)+'</span></div>';
+    var dateTag = (m && m.dayIndex!=null && cal && cal[m.dayIndex]) ? ('<div class="po-match-date mono">'+fmtDateCompact(cal[m.dayIndex])+' · '+timeForSlotPos(state,m.slotPos)+'</div>') : '';
+    var row = '<div class="po-match'+(known?'':' pending')+(extraClass?(' '+extraClass):'')+'"><span class="side home'+(known?'':' tbd')+'" title="'+esc(homeLabel)+'">'+esc(homeLabel)+'</span>'+scorePart+'<span class="side'+(known?'':' tbd')+'" title="'+esc(awayLabel)+'">'+esc(awayLabel)+'</span></div>';
+    return '<div class="po-match-block">'+dateTag+row+'</div>';
   }
   function renderPlayoffBracket(state){
     var p = state.playoff, active = !!(p && p.active);
+    // Before activation, the matchups aren't known yet, but the schedule is
+    // fully determined by the league calendar alone — so compute the same
+    // plan admin.html would lock in on activation, and show it early.
+    var plan = (!active && state.drawnAt) ? playoffSlotPlan(state) : null;
+    var cal = active ? calendar(state) : (plan ? weekdayDates(state.settings.startDate, plan[plan.length-1].dayIndex+1) : null);
     function seedLabel(n){ return n+". Sıra"; }
     function labelFor(teamId, fallback){ return teamId!=null ? teamName(state,teamId) : fallback; }
+    function previewSlot(planIdx){ return plan ? { home:null, away:null, hs:null, as:null, dayIndex:plan[planIdx].dayIndex, slotPos:plan[planIdx].slotPos } : null; }
     var qfPairs = [[1,8],[4,5],[2,7],[3,6]];
     var qfMatches = qfPairs.map(function(pair,i){
-      var m = active ? p.qf[i] : null;
+      var m = active ? p.qf[i] : previewSlot(i);
       var homeLabel = active ? labelFor(m.home, seedLabel(pair[0])) : seedLabel(pair[0]);
       var awayLabel = active ? labelFor(m.away, seedLabel(pair[1])) : seedLabel(pair[1]);
-      return renderPlayoffMatchRow(state, m, homeLabel, awayLabel);
+      return renderPlayoffMatchRow(state, m, homeLabel, awayLabel, null, cal);
     });
     var qfCol = '<div class="po-col">' +
       '<div class="po-pair">'+qfMatches[0]+qfMatches[1]+'</div>' +
@@ -516,21 +546,21 @@
     '</div>';
     var sfFallbacks = [["1. Çeyrek Final galibi","2. Çeyrek Final galibi"],["3. Çeyrek Final galibi","4. Çeyrek Final galibi"]];
     var sfMatches = [0,1].map(function(i){
-      var m = active ? p.sf[i] : null;
+      var m = active ? p.sf[i] : previewSlot(4+i);
       var homeLabel = active ? labelFor(m.home, sfFallbacks[i][0]) : sfFallbacks[i][0];
       var awayLabel = active ? labelFor(m.away, sfFallbacks[i][1]) : sfFallbacks[i][1];
-      return renderPlayoffMatchRow(state, m, homeLabel, awayLabel);
+      return renderPlayoffMatchRow(state, m, homeLabel, awayLabel, null, cal);
     });
     var sfCol = '<div class="po-col"><div class="po-pair">'+sfMatches[0]+sfMatches[1]+'</div></div>';
-    var finalM = active ? p.final : null;
+    var finalM = active ? p.final : previewSlot(6);
     var finalHome = active ? labelFor(finalM.home,"1. Yarı Final galibi") : "1. Yarı Final galibi";
     var finalAway = active ? labelFor(finalM.away,"2. Yarı Final galibi") : "2. Yarı Final galibi";
-    var finalRow = renderPlayoffMatchRow(state, finalM, finalHome, finalAway, "po-final");
+    var finalRow = renderPlayoffMatchRow(state, finalM, finalHome, finalAway, "po-final", cal);
     var finalCol = '<div class="po-col">'+finalRow+'</div>';
-    var thirdM = active ? p.third : null;
+    var thirdM = active ? p.third : previewSlot(7);
     var thirdHome = active ? labelFor(thirdM.home,"1. Yarı Final kaybedeni") : "1. Yarı Final kaybedeni";
     var thirdAway = active ? labelFor(thirdM.away,"2. Yarı Final kaybedeni") : "2. Yarı Final kaybedeni";
-    var thirdRow = renderPlayoffMatchRow(state, thirdM, thirdHome, thirdAway);
+    var thirdRow = renderPlayoffMatchRow(state, thirdM, thirdHome, thirdAway, null, cal);
     return '<div class="po-bracket">' +
       '<div class="po-round"><div class="po-round-label">Çeyrek Final</div>'+qfCol+'</div>' +
       '<div class="po-round"><div class="po-round-label">Yarı Final</div>'+sfCol+'</div>' +
@@ -539,7 +569,7 @@
     '<div class="po-third-wrap"><div class="po-third-label">3.lük Maçı</div>'+thirdRow+'</div>';
   }
   function renderPlayoff(state){
-    if (!state.drawnAt || !state.playoff || !state.playoff.active) return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel empty-state">Play-Off henüz aktif değil.</div></div>';
+    if (!state.drawnAt) return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel note">Play-Off, kura çekildikten sonra burada görünecek.</div></div>';
     return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel" style="overflow-x:auto">'+renderPlayoffBracket(state)+'</div></div>';
   }
 
