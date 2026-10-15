@@ -456,7 +456,7 @@
         return '<tr><td class="mono">'+esc(r.number||"")+'</td><td class="team-cell">'+esc(r.name)+'</td><td>'+r.goals+'</td><td>'+r.yellow+'</td><td>'+r.red+'</td></tr>';
       }).join('');
       var rosterTable = roster.length
-        ? '<table class="standings-table"><thead><tr><th>No</th><th>Ad Soyad</th><th>Gol</th><th><span class="card-icon card-icon-yellow"></span></th><th><span class="card-icon card-icon-red"></span></th></tr></thead><tbody>'+rosterRows+'</tbody></table>'
+        ? '<table class="standings-table"><thead><tr><th>Forma No</th><th>Ad Soyad</th><th>Gol</th><th><span class="card-icon card-icon-yellow"></span></th><th><span class="card-icon card-icon-red"></span></th></tr></thead><tbody>'+rosterRows+'</tbody></table>'
         : '<span class="note">Bu takımda henüz oyuncu eklenmedi.</span>';
       body += '<div class="panel" style="overflow-x:auto"><div class="section-head"><h2>Kadro</h2></div><div style="margin-top:12px">'+rosterTable+'</div></div>';
     }
