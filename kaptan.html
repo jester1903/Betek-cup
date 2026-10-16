@@ -190,8 +190,11 @@
       .map(function(r){ return { start:r.start, end:r.end }; });
   }
   function normalizePlayoffMatch(m){
-    if (!m) return { home:null, away:null, hs:null, as:null, events:[], dayIndex:null, slotPos:null };
-    return { home:m.home===undefined?null:m.home, away:m.away===undefined?null:m.away, hs:m.hs===undefined?null:m.hs, as:m.as===undefined?null:m.as, events:Array.isArray(m.events)?m.events:[], dayIndex:(m.dayIndex==null?null:m.dayIndex), slotPos:(m.slotPos==null?null:m.slotPos) };
+    if (!m) return { home:null, away:null, hs:null, as:null, events:[], dayIndex:null, slotPos:null, overrideDate:null, overrideTime:null };
+    var dRe = /^\d{4}-\d{2}-\d{2}$/, tRe = /^\d{2}:\d{2}$/;
+    return { home:m.home===undefined?null:m.home, away:m.away===undefined?null:m.away, hs:m.hs===undefined?null:m.hs, as:m.as===undefined?null:m.as, events:Array.isArray(m.events)?m.events:[], dayIndex:(m.dayIndex==null?null:m.dayIndex), slotPos:(m.slotPos==null?null:m.slotPos),
+      overrideDate: (typeof m.overrideDate==="string" && dRe.test(m.overrideDate)) ? m.overrideDate : null,
+      overrideTime: (typeof m.overrideTime==="string" && tRe.test(m.overrideTime)) ? m.overrideTime : null };
   }
   function normalizePlayoff(d){
     if (!d || !d.active) return null;
@@ -254,6 +257,20 @@
   function fmtDateCompact(d){ return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0"); }
   function fmtDateNumericFull(d){ return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear()+" "+DAYS_TR[d.getDay()]; }
   function timeForSlotPos(state, pos){ if (pos===0) return state.settings.slot1Time; if (pos===1) return state.settings.slot2Time; return state.settings.slot3Time||"19:00"; }
+  // Mirrors admin.html: a playoff match's own overrideDate/overrideTime (set
+  // from the admin screen for a single match, e.g. weather) wins over the
+  // bracket's computed dayIndex/slotPos wherever either is set.
+  function playoffMatchDate(m, cal){
+    if (m && m.overrideDate){
+      var p = m.overrideDate.split("-");
+      return new Date(parseInt(p[0],10), parseInt(p[1],10)-1, parseInt(p[2],10));
+    }
+    return (m && m.dayIndex!=null && cal) ? cal[m.dayIndex] : null;
+  }
+  function playoffMatchTime(state, m){
+    if (m && m.overrideTime) return m.overrideTime;
+    return m ? timeForSlotPos(state, m.slotPos) : null;
+  }
   function dayCount(state){
     var max=-1;
     state.matches.forEach(function(m){ if (m.dayIndex>max) max=m.dayIndex; });
@@ -561,7 +578,8 @@
     var known = !!(m && m.home!=null && m.away!=null);
     var played = known && m.hs!=null && m.as!=null;
     var scorePart = '<span class="score-static">'+(played?(m.hs+' : '+m.as):(known?'vs':'—'))+'</span>';
-    var dateTag = (m && m.dayIndex!=null && cal && cal[m.dayIndex]) ? ('<div class="po-match-date"><span class="po-match-day mono">'+fmtDateNumericFull(cal[m.dayIndex])+'</span> - saat <span class="mono">'+timeForSlotPos(state,m.slotPos)+'</span></div>') : '';
+    var dispDate = (m && m.dayIndex!=null && cal) ? playoffMatchDate(m, cal) : null;
+    var dateTag = dispDate ? ('<div class="po-match-date"><span class="po-match-day mono">'+fmtDateNumericFull(dispDate)+'</span> - saat <span class="mono">'+playoffMatchTime(state,m)+'</span></div>') : '';
     var row = '<div class="po-match'+(known?'':' pending')+(extraClass?(' '+extraClass):'')+'"><span class="side home'+(known?'':' tbd')+'" title="'+esc(homeLabel)+'">'+esc(homeLabel)+'</span>'+scorePart+'<span class="side'+(known?'':' tbd')+'" title="'+esc(awayLabel)+'">'+esc(awayLabel)+'</span></div>';
     return '<div class="po-match-block">'+dateTag+row+'</div>';
   }
