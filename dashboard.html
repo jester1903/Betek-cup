@@ -375,11 +375,11 @@ function renderStandingsSlide(slide){
     var rank = start+i+1;
     return '<tr class="'+(rank<=8?'top8':'')+'"><td class="rank mono">'+rank+'</td><td>'+esc(s.name)+'</td>' +
       '<td class="num">'+s.played+'</td><td class="num">'+s.won+'</td><td class="num">'+s.draw+'</td><td class="num">'+s.lost+'</td>' +
-      '<td class="num">'+(s.avg>0?'+':'')+s.avg+'</td><td class="num pts">'+s.pts+'</td></tr>';
+      '<td class="num">'+(s.avg>0?'+':'')+s.avg+'</td><td class="num">'+s.yellowCards+'</td><td class="num">'+s.redCards+'</td><td class="num pts">'+s.pts+'</td></tr>';
   }).join('');
   return '<div class="slide">' +
     '<div class="slide-title"><h2>Puan Durumu</h2><span class="sub">'+(slide.pages>1?('Sayfa '+(slide.page+1)+'/'+slide.pages+' · '):'')+'İlk 8 play-off\'a yükselir</span></div>' +
-    '<table class="standings-table"><thead><tr><th>#</th><th>Takım</th><th class="num">O</th><th class="num">G</th><th class="num">B</th><th class="num">M</th><th class="num">Av</th><th class="num">Puan</th></tr></thead><tbody>'+(rows||'')+'</tbody></table>' +
+    '<table class="standings-table"><thead><tr><th>#</th><th>Takım</th><th class="num">O</th><th class="num">G</th><th class="num">B</th><th class="num">M</th><th class="num">Av</th><th class="num" title="Sarı Kart">SK</th><th class="num" title="Kırmızı Kart">KK</th><th class="num">Puan</th></tr></thead><tbody>'+(rows||'')+'</tbody></table>' +
     '<div class="standings-note">Sıralama kuralı: puan eşitliğinde önce genel averaja, o da eşitse kırmızı kart sayısına (az olan önde), o da eşitse sarı kart sayısına (az olan önde), o da eşitse atılan gol sayısına (fazla olan önde) bakılır.</div>' +
     '</div>';
 }
