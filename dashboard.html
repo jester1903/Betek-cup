@@ -51,6 +51,7 @@
   .standings-table tbody tr.top8{ box-shadow:inset 4px 0 0 var(--accent); }
   .rank{ font-family:var(--font-mono); color:var(--ink-muted); }
   .pts{ font-weight:600; font-family:var(--font-mono); color:var(--accent-strong); }
+  .standings-note{ font-size:13px; color:var(--ink-muted); line-height:1.5; }
 
   /* scorers / cards slide */
   .two-col{ flex:1; min-height:0; display:grid; grid-template-columns:1.2fr 1fr; gap:22px; }
@@ -211,10 +212,18 @@ function isoOf(d){ return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.ge
 function timeForSlotPos(pos){ if (pos===0) return state.settings.slot1Time; if (pos===1) return state.settings.slot2Time; return state.settings.slot3Time||"19:00"; }
 
 // ---- istatistikler (admin.html ile aynı) ----
+// Tie-break order kept in sync with admin.html: puan, genel averaj, fewer
+// red cards, fewer yellow cards, more goals scored.
 function computeStandings(){
   var table = {};
-  state.teams.forEach(function(t){ table[t.id] = {teamId:t.id, name:t.name, played:0, won:0, draw:0, lost:0, gf:0, ga:0}; });
+  state.teams.forEach(function(t){ table[t.id] = {teamId:t.id, name:t.name, played:0, won:0, draw:0, lost:0, gf:0, ga:0, redCards:0, yellowCards:0}; });
   state.matches.forEach(function(m){
+    (m.events||[]).forEach(function(ev){
+      var r = table[ev.teamId];
+      if (!r) return;
+      if (ev.type==="red") r.redCards++;
+      else if (ev.type==="yellow") r.yellowCards++;
+    });
     if (m.hs==null || m.as==null) return;
     var h=table[m.home], a=table[m.away];
     if (!h||!a) return;
@@ -222,7 +231,7 @@ function computeStandings(){
     if (m.hs>m.as){ h.won++; a.lost++; } else if (m.hs<m.as){ a.won++; h.lost++; } else { h.draw++; a.draw++; }
   });
   var rows = Object.keys(table).map(function(id){ var r=table[id]; r.avg=r.gf-r.ga; r.pts=r.won*3+r.draw; return r; });
-  rows.sort(function(a,b){ return (b.pts-a.pts)||(b.avg-a.avg)||(b.gf-a.gf)||a.name.localeCompare(b.name,"tr"); });
+  rows.sort(function(a,b){ return (b.pts-a.pts)||(b.avg-a.avg)||(a.redCards-b.redCards)||(a.yellowCards-b.yellowCards)||(b.gf-a.gf)||a.name.localeCompare(b.name,"tr"); });
   return rows;
 }
 function allMatchesWithEvents(){
@@ -371,6 +380,7 @@ function renderStandingsSlide(slide){
   return '<div class="slide">' +
     '<div class="slide-title"><h2>Puan Durumu</h2><span class="sub">'+(slide.pages>1?('Sayfa '+(slide.page+1)+'/'+slide.pages+' · '):'')+'İlk 8 play-off\'a yükselir</span></div>' +
     '<table class="standings-table"><thead><tr><th>#</th><th>Takım</th><th class="num">O</th><th class="num">G</th><th class="num">B</th><th class="num">M</th><th class="num">Av</th><th class="num">Puan</th></tr></thead><tbody>'+(rows||'')+'</tbody></table>' +
+    '<div class="standings-note">Sıralama kuralı: puan eşitliğinde önce genel averaja, o da eşitse kırmızı kart sayısına (az olan önde), o da eşitse sarı kart sayısına (az olan önde), o da eşitse atılan gol sayısına (fazla olan önde) bakılır.</div>' +
     '</div>';
 }
 
