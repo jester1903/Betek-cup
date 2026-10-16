@@ -358,8 +358,8 @@
 
   // ---- istatistikler (admin.html ile birebir aynı) ----
   // Keep this tie-break order in sync with admin.html's computeStandings:
-  // puan, then genel averaj, then fewer red cards, then fewer yellow cards,
-  // then more goals scored.
+  // puan, then genel averaj, then more goals scored, then fewer yellow
+  // cards, then fewer red cards.
   function computeStandings(state){
     var table = {};
     state.teams.forEach(function(t){ table[t.id] = {teamId:t.id, name:t.name, played:0, won:0, draw:0, lost:0, gf:0, ga:0, redCards:0, yellowCards:0}; });
@@ -377,7 +377,7 @@
       if (m.hs>m.as){ h.won++; a.lost++; } else if (m.hs<m.as){ a.won++; h.lost++; } else { h.draw++; a.draw++; }
     });
     var rows = Object.keys(table).map(function(id){ var r=table[id]; r.avg=r.gf-r.ga; r.pts=r.won*3+r.draw; return r; });
-    rows.sort(function(a,b){ return (b.pts-a.pts)||(b.avg-a.avg)||(a.redCards-b.redCards)||(a.yellowCards-b.yellowCards)||(b.gf-a.gf)||a.name.localeCompare(b.name,"tr"); });
+    rows.sort(function(a,b){ return (b.pts-a.pts)||(b.avg-a.avg)||(b.gf-a.gf)||(a.yellowCards-b.yellowCards)||(a.redCards-b.redCards)||a.name.localeCompare(b.name,"tr"); });
     return rows;
   }
   function allMatchesWithEvents(state){
@@ -599,7 +599,12 @@
       return divider + '<tr'+(i<8?' class="po-qualify"':'')+'><td>'+(i+1)+'</td><td class="team-cell">'+esc(r.name)+'</td><td>'+r.played+'</td><td>'+r.won+'</td><td>'+r.draw+'</td><td>'+r.lost+'</td><td>'+(r.avg>0?'+':'')+r.avg+'</td><td>'+r.yellowCards+'</td><td>'+r.redCards+'</td><td class="pts">'+r.pts+'</td></tr>';
     }).join('');
     var table = '<div class="panel" style="overflow-x:auto"><table class="standings-table"><thead><tr><th></th><th>Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>AV</th><th title="Sarı Kart">SK</th><th title="Kırmızı Kart">KK</th><th>P</th></tr></thead><tbody>'+body+'</tbody></table>' +
-      '<div class="note" style="margin-top:10px">Sıralama kuralı: puan eşitliğinde önce genel averaja, o da eşitse kırmızı kart sayısına (az olan önde), o da eşitse sarı kart sayısına (az olan önde), o da eşitse atılan gol sayısına (fazla olan önde) bakılır.</div>' +
+      '<div class="note" style="margin-top:10px">Sıralama kuralı (puan eşitliğinde sırasıyla):<ol style="margin:6px 0 0;padding-left:18px;line-height:1.6">' +
+        '<li>Genel averaj</li>' +
+        '<li>Atılan gol sayısı (fazla olan önde)</li>' +
+        '<li>Sarı kart sayısı (az olan önde)</li>' +
+        '<li>Kırmızı kart sayısı (az olan önde)</li>' +
+      '</ol></div>' +
     '</div>';
     return '<div class="stage">'+renderSummaryStrip(state)+table+'</div>';
   }
