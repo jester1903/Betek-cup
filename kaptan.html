@@ -129,6 +129,20 @@
   .setup{ max-width:420px; margin:60px auto; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:24px; box-shadow:var(--shadow); }
   .setup input{ width:100%; margin-top:6px; margin-bottom:14px; padding:9px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--ink); font-family:inherit; font-size:14px; }
   .setup button{ background:var(--accent); color:var(--accent-ink); border:none; padding:10px 18px; border-radius:7px; font-family:var(--font-display); text-transform:uppercase; letter-spacing:.3px; font-weight:600; cursor:pointer; }
+
+  .oneri-form{ display:flex; flex-direction:column; gap:12px; }
+  .oneri-form label{ font-size:12.5px; color:var(--ink-muted); display:block; margin-bottom:5px; }
+  .oneri-form input[type="text"],.oneri-form textarea,.oneri-form select{
+    width:100%; font-family:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--border);
+    border-radius:6px; padding:9px; font-size:14px;
+  }
+  .oneri-form textarea{ resize:vertical; min-height:96px; }
+  .oneri-form input:focus,.oneri-form textarea:focus,.oneri-form select:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+  .oneri-submit-btn{ align-self:flex-start; background:var(--accent); color:var(--accent-ink); border:none; padding:10px 20px; border-radius:7px; font-family:var(--font-display); text-transform:uppercase; letter-spacing:.3px; font-weight:600; font-size:13px; cursor:pointer; }
+  .oneri-submit-btn:hover{ background:var(--accent-strong); }
+  .oneri-submit-btn[disabled]{ opacity:.6; cursor:default; }
+  .oneri-error{ font-size:13px; color:var(--brick); }
+  .oneri-sent{ text-align:center; padding:20px 10px; display:flex; flex-direction:column; gap:12px; align-items:center; }
 </style>
 </head>
 <body>
@@ -153,6 +167,7 @@
     <button class="tab-btn" data-tab="playoff">Play-Off</button>
     <button class="tab-btn" data-tab="krallik">Gol Krallığı</button>
     <button class="tab-btn" data-tab="kartlar">Kartlar</button>
+    <button class="tab-btn" data-tab="oneri">Öneri</button>
   </nav>
 </header>
 <main class="content" id="content"></main>
@@ -338,7 +353,7 @@
 
   var state = freshState();
   var uiTab = "ozet";
-  var uiState = { selectedTeamId:null };
+  var uiState = { selectedTeamId:null, oneriSent:false, oneriSubmitting:false, oneriError:null, oneriAdSoyadVal:"", oneriTakimVal:"", oneriMesajVal:"" };
   var supabaseClient = null;
 
   // ---- istatistikler (admin.html ile birebir aynı) ----
@@ -439,7 +454,7 @@
     return suspended;
   }
 
-  // ---- connection (read-only: select + realtime subscribe, never write) ----
+  // ---- connection ----
   // Live updates use two mechanisms at once: Supabase realtime (instant,
   // pushed over a websocket) and a plain REST poll (a fetch every couple of
   // seconds, works everywhere). Realtime is blocked outright on some
@@ -447,6 +462,10 @@
   // upgrade) — on those it just silently never fires, so the poll is the
   // one guaranteed way this page stays live, and it runs fast while a draw
   // ceremony is in progress and slower otherwise.
+  // The tournament state itself (turnuva_state) is read-only from here —
+  // this screen never writes to it. The one exception is the Öneri tab,
+  // which inserts a single row into its own separate turnuva_oneriler
+  // table (see renderOneri/submitOneri) rather than touching state.
   var pollTimer = null;
   function schedulePoll(){
     if (pollTimer) clearTimeout(pollTimer);
@@ -666,6 +685,72 @@
     return '<div class="stage">'+renderSummaryStrip(state)+yellowBlock+redBlock+'</div>';
   }
 
+  // Suggestions are written straight to their own turnuva_oneriler Supabase
+  // table (one insert per submission) rather than folded into state and
+  // saved through the normal turnuva_state read-modify-write — this screen
+  // has no business overwriting the shared tournament state, and a plain
+  // insert can't race against an admin editing scores at the same moment.
+  function renderOneri(state){
+    if (uiState.oneriSent){
+      return '<div class="stage">'+renderSummaryStrip(state)+
+        '<div class="panel oneri-sent"><h2>Teşekkürler!</h2><p class="note">Öneriniz iletildi.</p>' +
+        '<button class="oneri-submit-btn" data-action="oneri-new">Yeni öneri gönder</button></div></div>';
+    }
+    var teamOptions = '<option value="">— Takım (opsiyonel) —</option>' + state.teams.slice().sort(function(a,b){ return a.name.localeCompare(b.name,"tr"); }).map(function(t){
+      var sel = (uiState.oneriTakimVal ? uiState.oneriTakimVal===t.name : uiState.selectedTeamId===t.id);
+      return '<option value="'+esc(t.name)+'"'+(sel?' selected':'')+'>'+esc(t.name)+'</option>';
+    }).join('');
+    var errorBlock = uiState.oneriError ? '<div class="oneri-error">'+esc(uiState.oneriError)+'</div>' : '';
+    var form = '<div class="panel"><div class="section-head"><h2>Öneri / Geri Bildirim</h2></div>' +
+      '<p class="note" style="margin:8px 0 14px">Turnuvayla ilgili öneri, görüş ya da şikayetinizi aşağıya yazabilirsiniz — doğrudan turnuva yöneticisine iletilir.</p>' +
+      '<div class="oneri-form">' +
+        '<div><label for="oneriAdSoyad">Ad Soyad</label><input type="text" id="oneriAdSoyad" value="'+esc(uiState.oneriAdSoyadVal)+'" placeholder="Adınız Soyadınız"></div>' +
+        '<div><label for="oneriTakim">Takım</label><select id="oneriTakim">'+teamOptions+'</select></div>' +
+        '<div><label for="oneriMesaj">Öneriniz</label><textarea id="oneriMesaj" placeholder="Yazınız...">'+esc(uiState.oneriMesajVal)+'</textarea></div>' +
+        errorBlock +
+        '<button class="oneri-submit-btn" data-action="oneri-submit"'+(uiState.oneriSubmitting?' disabled':'')+'>'+(uiState.oneriSubmitting?'Gönderiliyor…':'Gönder')+'</button>' +
+      '</div></div>';
+    return '<div class="stage">'+renderSummaryStrip(state)+form+'</div>';
+  }
+
+  function submitOneri(){
+    var adEl = document.getElementById("oneriAdSoyad");
+    var takimEl = document.getElementById("oneriTakim");
+    var mesajEl = document.getElementById("oneriMesaj");
+    var ad = adEl ? adEl.value.trim() : "";
+    var takim = takimEl ? takimEl.value : "";
+    var mesaj = mesajEl ? mesajEl.value.trim() : "";
+    uiState.oneriAdSoyadVal = ad; uiState.oneriTakimVal = takim; uiState.oneriMesajVal = mesaj;
+    if (!ad || !mesaj){
+      uiState.oneriError = "Lütfen ad soyad ve öneri metnini girin.";
+      render();
+      return;
+    }
+    if (!supabaseClient){
+      uiState.oneriError = "Bağlantı yok, lütfen daha sonra tekrar deneyin.";
+      render();
+      return;
+    }
+    uiState.oneriSubmitting = true;
+    uiState.oneriError = null;
+    render();
+    supabaseClient.from("turnuva_oneriler").insert({ ad_soyad: ad, takim: takim||null, mesaj: mesaj }).then(function(r){
+      uiState.oneriSubmitting = false;
+      if (r && r.error){
+        uiState.oneriError = "Gönderilemedi: " + r.error.message;
+        render();
+        return;
+      }
+      uiState.oneriSent = true;
+      uiState.oneriAdSoyadVal = ""; uiState.oneriTakimVal = ""; uiState.oneriMesajVal = "";
+      render();
+    }).catch(function(e){
+      uiState.oneriSubmitting = false;
+      uiState.oneriError = "Gönderilemedi: bağlantı hatası";
+      render();
+    });
+  }
+
   // Read-only mirror of admin.html's live draw ceremony — whatever admin is
   // revealing right now (state.draw) shows up here the same way, via the
   // same realtime row updates already used for everything else on this page.
@@ -701,7 +786,7 @@
       window.scrollTo({ top: document.documentElement.scrollHeight, behavior:"smooth" });
       return;
     }
-    var renderers = { ozet:renderOzet, fikstur:renderFikstur, puan:renderPuanDurumu, playoff:renderPlayoff, krallik:renderGolKrallik, kartlar:renderKartlar };
+    var renderers = { ozet:renderOzet, fikstur:renderFikstur, puan:renderPuanDurumu, playoff:renderPlayoff, krallik:renderGolKrallik, kartlar:renderKartlar, oneri:renderOneri };
     var fn = renderers[uiTab] || renderOzet;
     document.getElementById("content").innerHTML = fn(state);
   }
@@ -715,6 +800,13 @@
   });
   document.getElementById("content").addEventListener("change", function(e){
     if (e.target.id==="ozetTeamSelect"){ uiState.selectedTeamId=e.target.value; render(); }
+  });
+  document.getElementById("content").addEventListener("click", function(e){
+    var btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    var action = btn.dataset.action;
+    if (action==="oneri-submit") submitOneri();
+    else if (action==="oneri-new"){ uiState.oneriSent=false; render(); }
   });
 
   connect();
