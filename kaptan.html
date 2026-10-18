@@ -65,7 +65,7 @@
   .match-row{ display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:7px; padding:8px 10px; }
   .tag{ font-family:var(--font-mono); font-size:9.5px; color:var(--ink-muted); background:var(--surface-2); border-radius:4px; padding:2px 6px; flex:none; }
   .tag.time{ background:var(--surface); border:1px solid var(--border); }
-  .match-row .side{ flex:1; min-width:0; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .match-row .side{ flex:1; min-width:0; font-size:12.5px; line-height:1.25; overflow:hidden; white-space:normal; word-break:break-word; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; }
   .match-row .side.home{ text-align:right; }
   .match-row .score-static{ font-family:var(--font-mono); font-weight:600; color:var(--accent-strong); flex:none; min-width:36px; text-align:center; }
   .match-row.pending{ opacity:.85; }
@@ -104,7 +104,7 @@
   .po-match-date{ font-size:11px; line-height:1.35; color:var(--ink-muted); margin:0 2px 4px; text-align:center; }
   .po-match-date .po-match-day{ font-weight:600; }
   .po-match{ display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:7px; padding:8px 10px; position:relative; z-index:1; }
-  .po-match .side{ flex:1; min-width:0; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .po-match .side{ flex:1; min-width:0; font-size:12.5px; line-height:1.25; overflow:hidden; white-space:normal; word-break:break-word; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; }
   .po-match .side.home{ text-align:right; }
   .po-match .side.tbd{ color:var(--ink-muted); font-style:italic; }
   .po-final{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
