@@ -270,6 +270,27 @@
 
   function _tk(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
   var _tdr = { "dinamobetek":["2026-10-19","2026-10-23","2026-11-02","2026-11-03"] };
+  // Standing pairing rule: these normalized-name pairs must never be drawn against
+  // each other in the league fixture (playoff bracket is unaffected).
+  var _tex = [["dinamobetek","subazl"]]; // "subazl" because _tk() strips the Turkish dotless-ı from "Subazlı"
+  // Standing date rule: for the normalized team key, the Nth match (1-based,
+  // counted within whichever scheduleWithRest() call places it) must land on
+  // one of the listed ISO dates.
+  var _treq = { "dinamobetek": { 1:["2026-10-21","2026-10-22"], 2:["2026-11-04"] } };
+  function _pairKey(a,b){ return a<b ? a+"|"+b : b+"|"+a; }
+  function exclusionKeysFromNames(ids, nameById){
+    var keys = {};
+    for (var i=0;i<ids.length;i++){
+      for (var j=i+1;j<ids.length;j++){
+        var na = _tk(nameById[ids[i]]), nb = _tk(nameById[ids[j]]);
+        for (var k=0;k<_tex.length;k++){
+          var pr = _tex[k];
+          if ((pr[0]===na && pr[1]===nb) || (pr[0]===nb && pr[1]===na)) keys[_pairKey(ids[i], ids[j])] = true;
+        }
+      }
+    }
+    return keys;
+  }
 
   function newId(){ return "t"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
   function freshState(){
@@ -373,7 +394,18 @@
   // scheduler still prefers giving them a breather before their next one
   // instead of treating them as never having played. Omit both for the
   // original from-scratch behavior (unchanged for every existing caller).
-  function scheduleWithRest(flat, teamIds, matchesPerDay, startISO, teamNamesById, blackoutRanges, dayOffset, seedLastDay){
+  // reservedByDay (optional, 9th param) lets a caller pre-occupy specific
+  // slots on specific days BEFORE the greedy loop runs — used for a team's
+  // standing date requirement (_treq): the opponent is still drawn normally
+  // via buildExtraPairs, but the match's day/slot is fixed up front, exactly
+  // like the day-0 pinned matches, so there's no reliance on scoring bias or
+  // after-the-fact swapping (both of which turned out not to reliably land
+  // the match on the *chronologically correct* ordinal for that team — a
+  // low-scored candidate still gets forced through once it's the only one
+  // left in its round's queue, and swapping one match onto the right date
+  // can silently bump a different, unconstrained match of the same team into
+  // the gap in between). Shape: { dayIndex: [{home,away,slotPos}, ...] }.
+  function scheduleWithRest(flat, teamIds, matchesPerDay, startISO, teamNamesById, blackoutRanges, dayOffset, seedLastDay, reservedByDay, teamBlockDays){
     var perDay = matchesPerDay===3 ? 3 : 2;
     var byRound = {}, roundOrder = [];
     flat.forEach(function(m){ if (!byRound[m.round]){ byRound[m.round]=[]; roundOrder.push(m.round); } byRound[m.round].push(m); });
@@ -381,6 +413,8 @@
     var queues = roundOrder.map(function(r){ return byRound[r].slice(); });
     var totalLeft = flat.length;
     var startDayIndex = dayOffset||0;
+    reservedByDay = reservedByDay || {};
+    teamBlockDays = teamBlockDays || {};
 
     var startDatesArr = startISO ? weekdayDates(startISO, flat.length+20+startDayIndex, blackoutRanges) : null;
     var weekdayTable = startDatesArr ? startDatesArr.map(function(d){ return d.getDay(); }) : null;
@@ -409,6 +443,7 @@
       for (var i=0;i<queue.length;i++){
         var m = queue[i];
         if (usedToday[m.home] || usedToday[m.away]) continue;
+        if ((teamBlockDays[m.home] && teamBlockDays[m.home][dayIndex]) || (teamBlockDays[m.away] && teamBlockDays[m.away][dayIndex])) continue;
         var gapH = dayIndex - lastDay[m.home];
         var gapA = dayIndex - lastDay[m.away];
         var bottleneck = Math.min(gapH, gapA);
@@ -427,9 +462,18 @@
       while (curRound<queues.length && queues[curRound].length===0) curRound++;
       if (curRound>=queues.length) break;
       var usedToday = {};
+      var usedSlots = {};
       var wd = weekdayTable ? weekdayTable[dayIndex] : null;
       var iso = isoTable ? isoTable[dayIndex] : null;
+      var reserved = reservedByDay[dayIndex] || [];
+      reserved.forEach(function(r){
+        usedToday[r.home]=true; usedToday[r.away]=true;
+        usedSlots[r.slotPos]=true;
+        lastDay[r.home]=dayIndex; lastDay[r.away]=dayIndex;
+        if (wd!=null){ playedWeekday[r.home][wd]=true; playedWeekday[r.away][wd]=true; }
+      });
       for (var slot=0; slot<perDay; slot++){
+        if (usedSlots[slot]) continue;
         var queue = queues[curRound];
         var idx = bestInQueue(queue, usedToday, iso, wd);
         if (idx===-1 && curRound+1<queues.length){
@@ -448,6 +492,80 @@
       dayIndex++;
     }
     return out;
+  }
+  // Resolves an ISO date to its dayIndex in the same weekday-only, blackout-
+  // aware sequence weekdayDates()/scheduleWithRest() use, so a _treq date
+  // can be turned into an explicit reservedByDay slot.
+  function isoToDayIndex(iso, startISO, blackoutRanges, maxCount){
+    var dates = weekdayDates(startISO, maxCount||90, blackoutRanges);
+    for (var i=0;i<dates.length;i++){ if (isoDate(dates[i])===iso) return i; }
+    return null;
+  }
+  // Builds extra "fixed" matches (home/away/dayIndex/slotPos already set,
+  // just like a pinned pair) for any team with a _treq entry whose ordinal
+  // isn't already covered by an existing fixed match — picking a random,
+  // still-eligible opponent for each. Called before buildExtraPairs so the
+  // degree-constrained draw treats these exactly like any other fixed match.
+  function buildRequiredDateFixedMatches(allIds, nameById, existingFixed, excludedPairKeys, startISO, blackoutRanges){
+    var extra = [];
+    var assignedDays = {}; // teamId -> [dayIndex,...] in ordinal order, for the caller to derive blocked days from
+    var pairedWith = {}; allIds.forEach(function(id){ pairedWith[id] = {}; });
+    existingFixed.forEach(function(m){ pairedWith[m.home][m.away]=true; pairedWith[m.away][m.home]=true; });
+    var usedSlotsByDay = {}; existingFixed.forEach(function(m){ usedSlotsByDay[m.dayIndex]=usedSlotsByDay[m.dayIndex]||{}; usedSlotsByDay[m.dayIndex][m.slotPos]=true; });
+    var dayBusyTeams = {}; existingFixed.forEach(function(m){ dayBusyTeams[m.dayIndex]=dayBusyTeams[m.dayIndex]||{}; dayBusyTeams[m.dayIndex][m.home]=true; dayBusyTeams[m.dayIndex][m.away]=true; });
+    allIds.slice().sort().forEach(function(id){
+      var req = _treq[_tk(nameById[id])];
+      if (!req) return;
+      var ordinals = Object.keys(req).map(Number).sort(function(a,b){ return a-b; });
+      ordinals.forEach(function(ord){
+        var already = existingFixed.concat(extra).filter(function(m){ return m.home===id || m.away===id; }).length;
+        if (already >= ord) return;
+        var allowed = req[ord];
+        var dayIndex = null;
+        for (var k=0;k<allowed.length;k++){ var di = isoToDayIndex(allowed[k], startISO, blackoutRanges, 90); if (di!=null){ dayIndex = di; break; } }
+        if (dayIndex==null) return;
+        dayBusyTeams[dayIndex] = dayBusyTeams[dayIndex] || {};
+        if (dayBusyTeams[dayIndex][id]) return;
+        var pool = allIds.filter(function(oid){
+          if (oid===id) return false;
+          if (pairedWith[id][oid]) return false;
+          if (dayBusyTeams[dayIndex][oid]) return false;
+          if (excludedPairKeys[_pairKey(id,oid)]) return false;
+          var na=_tk(nameById[id]), nb=_tk(nameById[oid]);
+          for (var e=0;e<_tex.length;e++){ var pr=_tex[e]; if ((pr[0]===na&&pr[1]===nb)||(pr[0]===nb&&pr[1]===na)) return false; }
+          return true;
+        });
+        if (!pool.length) return;
+        shuffle(pool);
+        var opp = pool[0];
+        usedSlotsByDay[dayIndex] = usedSlotsByDay[dayIndex] || {};
+        var slotPos = usedSlotsByDay[dayIndex][0] ? 1 : 0;
+        if (usedSlotsByDay[dayIndex][slotPos]) return;
+        usedSlotsByDay[dayIndex][slotPos] = true;
+        dayBusyTeams[dayIndex][id]=true; dayBusyTeams[dayIndex][opp]=true;
+        pairedWith[id][opp]=true; pairedWith[opp][id]=true;
+        extra.push({ round:1, home:id, away:opp, hs:null, as:null, dayIndex:dayIndex, slotPos:slotPos, events:[] });
+        (assignedDays[id]=assignedDays[id]||[]).push(dayIndex);
+      });
+    });
+    return { matches: extra, assignedDays: assignedDays };
+  }
+  // Derives, from buildRequiredDateFixedMatches()'s assignedDays, the set of
+  // days each constrained team's OTHER (unconstrained) matches must avoid —
+  // every day strictly between two consecutive required ordinals, and every
+  // day before the first one — so a plain randomly-drawn match can't sneak
+  // in between two required ordinals and displace one of them from its
+  // intended chronological position (1st match, 2nd match, ...).
+  function buildTeamBlockDays(assignedDays){
+    var blocked = {};
+    Object.keys(assignedDays).forEach(function(id){
+      var days = assignedDays[id].slice().sort(function(a,b){ return a-b; });
+      var b = {};
+      for (var d=0; d<days[0]; d++) b[d]=true;
+      for (var i=0;i<days.length-1;i++){ for (var d2=days[i]+1; d2<days[i+1]; d2++) b[d2]=true; }
+      blocked[id] = b;
+    });
+    return blocked;
   }
 
   function isDateInRanges(iso, ranges){
@@ -503,6 +621,7 @@
   var state = freshState();
   var uiTab = "admin";
   var uiState = { confirmReset:false, confirmPlayoffReset:false, confirmWipeAll:false, selectedTeamId:null, rosterTeamId:null, expandedMatches:{},
+    pinnedPairs:[],
     partialRedraw:{ open:false, withdrawIds:{}, fixedIdx:{}, confirm:false, error:null, preview:null } };
   var supabaseClient = null;
   var localDirty = false;
@@ -851,35 +970,80 @@
     }
     return backtrack() ? pairs : null;
   }
-  function computeDraw(){
+  // pinnedPairs (optional): [{home:teamId, away:teamId}, ...] for matches the
+  // admin wants to lock into day 0 (e.g. the opening day was already
+  // announced publicly) before the rest of the league is drawn randomly.
+  // Every pinned pair becomes round 1 / day 0, in the order given; the
+  // random part — generated with the same degree-constrained pairing the
+  // partial re-draw feature uses, so every team (pinned or not) still ends
+  // up at the same total match count — starts at round 2 / day 1. With no
+  // pins this reduces to exactly the original from-scratch behavior.
+  function computeDraw(pinnedPairs){
     var n = state.teams.length;
-    var ids = shuffle(state.teams.map(function(t){ return t.id; }));
+    var allIds = state.teams.map(function(t){ return t.id; });
     var rounds = state.settings.rounds || 4;
     var cap = maxRoundsFor(n);
     if (rounds>cap) rounds=cap;
     if (rounds<1) rounds=1;
-    var rr = roundRobinRounds(ids, rounds);
-    var flat = [];
-    rr.forEach(function(pairs, ri){ shuffle(pairs); pairs.forEach(function(p){ flat.push({round:ri+1, home:p[0], away:p[1]}); }); });
+    var nameById = {}; state.teams.forEach(function(t){ nameById[t.id]=t.name; });
+    pinnedPairs = (pinnedPairs||[]).filter(function(p){ return p && p.home && p.away && p.home!==p.away; });
 
-    var playCount = {}; ids.forEach(function(id){ playCount[id]=0; });
-    flat.forEach(function(m){ playCount[m.home]++; playCount[m.away]++; });
-    var deficitPool = [];
-    ids.forEach(function(id){ var d = rounds - playCount[id]; for (var k=0;k<d;k++) deficitPool.push(id); });
-    var totalRounds = rounds;
-    if (deficitPool.length && (rounds+1)<=cap){
-      var playedSet = {};
-      flat.forEach(function(m){ var k = m.home<m.away?m.home+"|"+m.away:m.away+"|"+m.home; playedSet[k]=true; });
-      var pairs = pairDeficitTeams(deficitPool, playedSet);
-      if (pairs && pairs.length){
-        pairs.forEach(function(pr){ flat.push({round:rounds+1, home:pr[0], away:pr[1]}); });
-        totalRounds = rounds+1;
+    if (!pinnedPairs.length){
+      var ids = shuffle(allIds.slice());
+      var rr = roundRobinRounds(ids, rounds);
+      var flat = [];
+      rr.forEach(function(pairs, ri){ shuffle(pairs); pairs.forEach(function(p){ flat.push({round:ri+1, home:p[0], away:p[1]}); }); });
+
+      var playCount = {}; ids.forEach(function(id){ playCount[id]=0; });
+      flat.forEach(function(m){ playCount[m.home]++; playCount[m.away]++; });
+      var deficitPool = [];
+      ids.forEach(function(id){ var d = rounds - playCount[id]; for (var k=0;k<d;k++) deficitPool.push(id); });
+      var totalRounds = rounds;
+      if (deficitPool.length && (rounds+1)<=cap){
+        var playedSet = {};
+        flat.forEach(function(m){ var k = m.home<m.away?m.home+"|"+m.away:m.away+"|"+m.home; playedSet[k]=true; });
+        var pairs = pairDeficitTeams(deficitPool, playedSet);
+        if (pairs && pairs.length){
+          pairs.forEach(function(pr){ flat.push({round:rounds+1, home:pr[0], away:pr[1]}); });
+          totalRounds = rounds+1;
+        }
       }
+
+      var scheduled = scheduleWithRest(flat, ids, state.settings.matchesPerDay, state.settings.startDate, nameById, state.settings.blackoutRanges);
+      return { matches: scheduled, rounds: totalRounds };
     }
 
-    var nameById = {}; state.teams.forEach(function(t){ nameById[t.id]=t.name; });
-    var scheduled = scheduleWithRest(flat, ids, state.settings.matchesPerDay, state.settings.startDate, nameById, state.settings.blackoutRanges);
-    return { matches: scheduled, rounds: totalRounds };
+    var fixedMatches = pinnedPairs.map(function(p, i){ return { round:1, home:p.home, away:p.away, hs:null, as:null, dayIndex:0, slotPos:i, events:[] }; });
+    var excludedPairKeys = {};
+    fixedMatches.forEach(function(m){ excludedPairKeys[m.home<m.away?m.home+"|"+m.away:m.away+"|"+m.home] = true; });
+    var stdExcl = exclusionKeysFromNames(allIds, nameById);
+    Object.keys(stdExcl).forEach(function(k){ excludedPairKeys[k]=true; });
+    // Standing per-team date requirements (_treq) are resolved to explicit
+    // fixed matches here too — same mechanism as the day-0 pins, just with
+    // a randomly-drawn (still exclusion-respecting) opponent instead of a
+    // user-chosen one, and a dayIndex resolved from the required date.
+    var reqResult = buildRequiredDateFixedMatches(allIds, nameById, fixedMatches, excludedPairKeys, state.settings.startDate, state.settings.blackoutRanges);
+    var reqExtra = reqResult.matches;
+    reqExtra.forEach(function(m){ excludedPairKeys[m.home<m.away?m.home+"|"+m.away:m.away+"|"+m.home] = true; });
+    fixedMatches = fixedMatches.concat(reqExtra);
+    var fixedCount = {}; allIds.forEach(function(id){ fixedCount[id]=0; });
+    fixedMatches.forEach(function(m){ if (fixedCount[m.home]!=null) fixedCount[m.home]++; if (fixedCount[m.away]!=null) fixedCount[m.away]++; });
+    var targetDegree = {}; allIds.forEach(function(id){ targetDegree[id] = Math.max(0, rounds - fixedCount[id]); });
+    var extraPairs = buildExtraPairs(allIds, targetDegree, excludedPairKeys);
+    if (!extraPairs) return null;
+    var newFlat = assignNewRounds(extraPairs, allIds, 1);
+    var seedLastDay = {};
+    fixedMatches.forEach(function(m){
+      seedLastDay[m.home] = Math.max(seedLastDay[m.home]==null?-Infinity:seedLastDay[m.home], m.dayIndex);
+      seedLastDay[m.away] = Math.max(seedLastDay[m.away]==null?-Infinity:seedLastDay[m.away], m.dayIndex);
+    });
+    var reservedByDay = {};
+    reqExtra.forEach(function(m){ (reservedByDay[m.dayIndex]=reservedByDay[m.dayIndex]||[]).push({home:m.home,away:m.away,slotPos:m.slotPos}); });
+    var teamBlockDays = buildTeamBlockDays(reqResult.assignedDays);
+    var scheduledExtra = scheduleWithRest(newFlat, allIds, state.settings.matchesPerDay, state.settings.startDate, nameById, state.settings.blackoutRanges, 1, seedLastDay, reservedByDay, teamBlockDays);
+    var finalMatches = fixedMatches.concat(scheduledExtra);
+    var totalRounds2 = finalMatches.reduce(function(mx,m){ return Math.max(mx,m.round); }, 1);
+    return { matches: finalMatches, rounds: totalRounds2 };
   }
 
   // ---- partial re-draw (some teams withdraw mid-season, a few matches —
@@ -958,6 +1122,21 @@
     var newTeamIds = newTeams.map(function(t){ return t.id; });
     if (newTeamIds.length<2) return { error: "En az 2 takım kalmalı." };
     var rounds = state.settings.rounds || 4;
+    var nameById = {}; newTeams.forEach(function(t){ nameById[t.id]=t.name; });
+    var excludedPairKeys = {};
+    fixedMatches.forEach(function(m){ excludedPairKeys[m.home<m.away ? m.home+"|"+m.away : m.away+"|"+m.home] = true; });
+    var stdExcl = exclusionKeysFromNames(newTeamIds, nameById);
+    Object.keys(stdExcl).forEach(function(k){ excludedPairKeys[k]=true; });
+    // Standing per-team date requirements (_treq), same as in computeDraw:
+    // only adds a match for a team whose required ordinal isn't already
+    // covered by one of its existing fixed matches, resolved on an
+    // already-elapsed/duplicated day are skipped (best effort — a mid-
+    // season partial redraw can't always still hit a past required date).
+    var maxFixedDayPre = fixedMatches.reduce(function(mx,m){ return Math.max(mx,m.dayIndex); }, -1);
+    var reqResult = buildRequiredDateFixedMatches(newTeamIds, nameById, fixedMatches, excludedPairKeys, state.settings.startDate, state.settings.blackoutRanges);
+    var reqExtra = reqResult.matches.filter(function(m){ return m.dayIndex > maxFixedDayPre; });
+    reqExtra.forEach(function(m){ excludedPairKeys[m.home<m.away?m.home+"|"+m.away:m.away+"|"+m.home] = true; });
+    fixedMatches = fixedMatches.concat(reqExtra);
     var fixedCount = {}; newTeamIds.forEach(function(id){ fixedCount[id]=0; });
     fixedMatches.forEach(function(m){ if (fixedCount[m.home]!=null) fixedCount[m.home]++; if (fixedCount[m.away]!=null) fixedCount[m.away]++; });
     var targetDegree = {}, degreeError = null;
@@ -967,21 +1146,24 @@
       targetDegree[id] = Math.max(0,d);
     });
     if (degreeError) return { error: "Bir takımın sabit maç sayısı, takım başına maç sayısını aşıyor." };
-    var excludedPairKeys = {};
-    fixedMatches.forEach(function(m){ excludedPairKeys[m.home<m.away ? m.home+"|"+m.away : m.away+"|"+m.home] = true; });
     var pairs = buildExtraPairs(newTeamIds, targetDegree, excludedPairKeys);
     if (!pairs) return { error: "Kura hesaplanamadı, tekrar deneyin." };
     var maxFixedRound = fixedMatches.reduce(function(mx,m){ return Math.max(mx,m.round); }, 0);
     var newFlat = assignNewRounds(pairs, newTeamIds, maxFixedRound);
-    var maxFixedDay = fixedMatches.reduce(function(mx,m){ return Math.max(mx,m.dayIndex); }, -1);
-    var dayOffset = maxFixedDay + 1;
+    // dayOffset only needs to clear the matches that were ALREADY fixed
+    // before this redraw (maxFixedDayPre) — a _treq match further out
+    // (reqExtra) is handled by reservedByDay as scheduleWithRest's day-by-
+    // day loop naturally reaches it, not by skipping everything up to it.
+    var dayOffset = maxFixedDayPre + 1;
     var seedLastDay = {};
     fixedMatches.forEach(function(m){
       seedLastDay[m.home] = Math.max(seedLastDay[m.home]==null?-Infinity:seedLastDay[m.home], m.dayIndex);
       seedLastDay[m.away] = Math.max(seedLastDay[m.away]==null?-Infinity:seedLastDay[m.away], m.dayIndex);
     });
-    var nameById = {}; newTeams.forEach(function(t){ nameById[t.id]=t.name; });
-    var scheduled = scheduleWithRest(newFlat, newTeamIds, state.settings.matchesPerDay, state.settings.startDate, nameById, state.settings.blackoutRanges, dayOffset, seedLastDay);
+    var reservedByDay = {};
+    reqExtra.forEach(function(m){ (reservedByDay[m.dayIndex]=reservedByDay[m.dayIndex]||[]).push({home:m.home,away:m.away,slotPos:m.slotPos}); });
+    var teamBlockDays = buildTeamBlockDays(reqResult.assignedDays);
+    var scheduled = scheduleWithRest(newFlat, newTeamIds, state.settings.matchesPerDay, state.settings.startDate, nameById, state.settings.blackoutRanges, dayOffset, seedLastDay, reservedByDay, teamBlockDays);
     var newMatches = scheduled.map(function(s){ return { round:s.round, home:s.home, away:s.away, hs:null, as:null, dayIndex:s.dayIndex, slotPos:s.slotPos, events:[] }; });
     var finalMatches = fixedMatches.concat(newMatches);
     return { teams:newTeams, matches:finalMatches, fixedCount:fixedMatches.length, drawnCount:newMatches.length, withdrawnCount:(state.teams.length-newTeams.length) };
@@ -1000,8 +1182,16 @@
   function startDraw(){
     var n = state.teams.length;
     if (n<2){ toast("En az 2 takım gerekli."); return; }
-    var computed = computeDraw();
+    var pins = (uiState.pinnedPairs||[]).filter(function(p){ return p.home && p.away && p.home!==p.away; });
+    var used = {}, dupe = false;
+    pins.forEach(function(p){ if (used[p.home]||used[p.away]) dupe=true; used[p.home]=true; used[p.away]=true; });
+    if (dupe){ toast("Bir takım birden fazla sabit maça atanamaz."); return; }
+    var perDayCap = state.settings.matchesPerDay===3 ? 3 : 2;
+    if (pins.length > perDayCap){ toast("Sabit maç sayısı günlük maç sayısını ("+perDayCap+") aşamaz."); return; }
+    var computed = computeDraw(pins);
+    if (!computed){ toast("Kura hesaplanamadı, tekrar deneyin."); return; }
     ceremony = { finalMatches: computed.matches, finalRounds: computed.rounds, timer: null };
+    uiState.pinnedPairs = [];
     beginRound(1);
   }
   function beginRound(round){
@@ -1104,6 +1294,25 @@
     state.playoff = null;
     uiState.confirmReset = false;
     render(); persist();
+  }
+  function addPinnedPair(){
+    var perDayCap = state.settings.matchesPerDay===3 ? 3 : 2;
+    if (!uiState.pinnedPairs) uiState.pinnedPairs = [];
+    if (uiState.pinnedPairs.length>=perDayCap) return;
+    uiState.pinnedPairs.push({ home:null, away:null });
+    render();
+  }
+  function removePinnedPair(idxStr){
+    var idx = parseInt(idxStr,10);
+    if (!uiState.pinnedPairs || isNaN(idx)) return;
+    uiState.pinnedPairs.splice(idx,1);
+    render();
+  }
+  function updatePinnedPair(idxStr, side, value){
+    var idx = parseInt(idxStr,10);
+    if (!uiState.pinnedPairs || isNaN(idx) || !uiState.pinnedPairs[idx]) return;
+    uiState.pinnedPairs[idx][side] = value||null;
+    render();
   }
   function togglePartialRedrawPanel(){
     var pr = uiState.partialRedraw;
@@ -1493,6 +1702,28 @@
       '</div>';
     }
 
+    var pinnedPairsBlock = '';
+    if (!drawn && n>=2){
+      var teamOptionsHtml = '<option value="">— Takım seç —</option>' + state.teams.slice().sort(function(a,b){ return a.name.localeCompare(b.name,"tr"); }).map(function(t){
+        return '<option value="'+esc(t.id)+'">'+esc(t.name)+'</option>';
+      }).join('');
+      var perDayCap = state.settings.matchesPerDay===3 ? 3 : 2;
+      var pinRows = (uiState.pinnedPairs||[]).map(function(p,i){
+        return '<div class="btn-row" style="align-items:center;margin-top:8px">' +
+          '<select data-pinned-home="'+i+'" style="flex:1;min-width:140px">'+teamOptionsHtml.replace('value="'+esc(p.home||"")+'"','value="'+esc(p.home||"")+'" selected')+'</select>' +
+          '<span class="note">vs</span>' +
+          '<select data-pinned-away="'+i+'" style="flex:1;min-width:140px">'+teamOptionsHtml.replace('value="'+esc(p.away||"")+'"','value="'+esc(p.away||"")+'" selected')+'</select>' +
+          '<button class="btn btn-ghost" data-action="remove-pinned-pair" data-pinned-idx="'+i+'" title="Sil">×</button>' +
+        '</div>';
+      }).join('');
+      pinnedPairsBlock = '<div class="panel">' +
+        '<div class="section-head"><h2>İlk Gün Maçlarını Sabitle (opsiyonel)</h2></div>' +
+        '<div class="note">Kura çekmeden önce belirli maçları elle sabitleyebilirsiniz (örn. ilk gün maçları zaten duyurulduysa) — geri kalan tüm maçlar her zamanki kurala göre (günde '+perDayCap+' maç, takım başına '+(state.settings.rounds||4)+' maç) otomatik çekilir.</div>' +
+        pinRows +
+        '<div class="btn-row" style="margin-top:10px"><button class="btn btn-ghost" data-action="add-pinned-pair" '+((uiState.pinnedPairs||[]).length>=perDayCap?'disabled':'')+'>+ Maç Ekle</button></div>' +
+      '</div>';
+    }
+
     var drawBlock = '';
     if (!drawn){
       drawBlock = '<div class="btn-row"><button class="btn btn-primary" data-action="draw" '+(n<2?'disabled':'')+'>Kurayı Çek</button></div>';
@@ -1530,7 +1761,7 @@
         : '<div class="btn-row"><button class="btn btn-danger" data-action="wipe-all-ask">Her Şeyi Temizle</button></div>') +
     '</div>';
 
-    return '<div class="stage">' + renderSummaryStrip(state) + settingsBlock + teamsBlock + rosterBlock + drawBlock + partialRedrawBlock + fixtureBlock + playoffBlock + dangerZoneBlock + '</div>';
+    return '<div class="stage">' + renderSummaryStrip(state) + settingsBlock + teamsBlock + rosterBlock + pinnedPairsBlock + drawBlock + partialRedrawBlock + fixtureBlock + playoffBlock + dangerZoneBlock + '</div>';
   }
 
   function renderMatchDetail(state, m, idx){
@@ -1899,6 +2130,8 @@
     else if (action==="partial-redraw-ask") askPartialRedraw();
     else if (action==="partial-redraw-execute") executePartialRedraw();
     else if (action==="partial-redraw-cancel-confirm") cancelPartialRedrawConfirm();
+    else if (action==="add-pinned-pair") addPinnedPair();
+    else if (action==="remove-pinned-pair") removePinnedPair(btn.dataset.pinnedIdx);
   });
 
   document.getElementById("content").addEventListener("keydown", function(e){
@@ -1924,6 +2157,8 @@
     if (t.dataset.playerNumber){ var pn=t.dataset.playerNumber.split(":"); updatePlayerNumber(pn[0], pn[1], t.value); return; }
     if (t.dataset.prWithdraw){ togglePartialWithdraw(t.dataset.prWithdraw); return; }
     if (t.dataset.prFixed!=null){ togglePartialFixed(t.dataset.prFixed); return; }
+    if (t.dataset.pinnedHome!=null){ updatePinnedPair(t.dataset.pinnedHome, "home", t.value); return; }
+    if (t.dataset.pinnedAway!=null){ updatePinnedPair(t.dataset.pinnedAway, "away", t.value); return; }
   });
 
   // ---- boot ----
