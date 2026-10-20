@@ -67,6 +67,15 @@
   .team-chip{ display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:7px 10px; font-size:13px; }
   .team-chip button{ border:none; background:none; color:var(--brick); font-size:15px; line-height:1; padding:0 2px; cursor:pointer; }
 
+  .pr-chip{ display:flex; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:7px 10px; font-size:13px; cursor:pointer; user-select:none; }
+  .pr-chip input{ width:auto; flex:none; }
+  .pr-chip.checked{ border-color:var(--brick); background:rgba(224,122,95,.12); }
+  .pr-match-row{ display:flex; align-items:center; gap:9px; background:var(--surface); border:1px solid var(--border); border-radius:7px; padding:7px 11px; cursor:pointer; user-select:none; }
+  .pr-match-row input{ width:auto; flex:none; }
+  .pr-match-row.checked{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .pr-match-row .side{ flex:1; min-width:0; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pr-match-row .side.home{ text-align:right; }
+
   .btn{ border:1px solid transparent; border-radius:7px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer; font-family:var(--font-display); letter-spacing:.3px; text-transform:uppercase; }
   .btn-primary{ background:var(--accent); color:var(--accent-ink); }
   .btn-primary:hover{ background:var(--accent-strong); }
@@ -355,15 +364,25 @@
   // round conflicts with a team already playing that day), the scheduler fills
   // the day's remaining slot(s) with the next round's matches instead of
   // leaving the day half-empty and waiting for a fresh day to start that round.
-  function scheduleWithRest(flat, teamIds, matchesPerDay, startISO, teamNamesById, blackoutRanges){
+  // dayOffset/seedLastDay (both optional, added for the partial re-draw
+  // feature below) let a redraw continue the SAME global day numbering a set
+  // of already-fixed matches started: dayOffset is the first dayIndex new
+  // matches may use (so an already-fully-booked earlier day is never
+  // double-booked), and seedLastDay{teamId:dayIndex} primes the rest-gap
+  // calculation for teams that already have a fixed match, so the greedy
+  // scheduler still prefers giving them a breather before their next one
+  // instead of treating them as never having played. Omit both for the
+  // original from-scratch behavior (unchanged for every existing caller).
+  function scheduleWithRest(flat, teamIds, matchesPerDay, startISO, teamNamesById, blackoutRanges, dayOffset, seedLastDay){
     var perDay = matchesPerDay===3 ? 3 : 2;
     var byRound = {}, roundOrder = [];
     flat.forEach(function(m){ if (!byRound[m.round]){ byRound[m.round]=[]; roundOrder.push(m.round); } byRound[m.round].push(m); });
     roundOrder.sort(function(a,b){ return a-b; });
     var queues = roundOrder.map(function(r){ return byRound[r].slice(); });
     var totalLeft = flat.length;
+    var startDayIndex = dayOffset||0;
 
-    var startDatesArr = startISO ? weekdayDates(startISO, flat.length+20, blackoutRanges) : null;
+    var startDatesArr = startISO ? weekdayDates(startISO, flat.length+20+startDayIndex, blackoutRanges) : null;
     var weekdayTable = startDatesArr ? startDatesArr.map(function(d){ return d.getDay(); }) : null;
     var isoTable = startDatesArr ? startDatesArr.map(isoDate) : null;
     var teamRestrict = {};
@@ -374,8 +393,8 @@
     teamIds.forEach(function(id){ playedWeekday[id] = {}; });
     var out = [];
     var lastDay = {};
-    teamIds.forEach(function(id){ lastDay[id] = -Infinity; });
-    var dayIndex = 0, guard = 0, curRound = 0;
+    teamIds.forEach(function(id){ lastDay[id] = (seedLastDay && seedLastDay[id]!=null) ? seedLastDay[id] : -Infinity; });
+    var dayIndex = startDayIndex, guard = 0, curRound = 0;
 
     // Rest is tiered, not just binary: a candidate where both teams get at
     // least 2 full rest days (dayIndex gap >= 3) is strongly preferred over
@@ -483,7 +502,8 @@
   // ---- state / persistence (Supabase: one JSONB row, id="main") ----
   var state = freshState();
   var uiTab = "admin";
-  var uiState = { confirmReset:false, confirmPlayoffReset:false, confirmWipeAll:false, selectedTeamId:null, rosterTeamId:null, expandedMatches:{} };
+  var uiState = { confirmReset:false, confirmPlayoffReset:false, confirmWipeAll:false, selectedTeamId:null, rosterTeamId:null, expandedMatches:{},
+    partialRedraw:{ open:false, withdrawIds:{}, fixedIdx:{}, confirm:false, error:null, preview:null } };
   var supabaseClient = null;
   var localDirty = false;
   var writeChain = Promise.resolve();
@@ -861,6 +881,112 @@
     var scheduled = scheduleWithRest(flat, ids, state.settings.matchesPerDay, state.settings.startDate, nameById, state.settings.blackoutRanges);
     return { matches: scheduled, rounds: totalRounds };
   }
+
+  // ---- partial re-draw (some teams withdraw mid-season, a few matches —
+  // e.g. ones already announced or played — stay fixed, everything else is
+  // redrawn so every remaining team still ends up at the same total match
+  // count) ----
+  //
+  // This is a degree-constrained pairing problem, not a plain round-robin:
+  // a team already in a fixed match needs fewer *new* opponents than one
+  // starting from zero. buildExtraPairs is a randomized Havel–Hakimi-style
+  // greedy construction (always connect the neediest unfinished team to a
+  // random eligible partner) with bounded retries — simpler to get right
+  // than full backtracking, and at this scale (a few dozen teams, degree
+  // well under 10) a few retries converge essentially every time.
+  function buildExtraPairs(teamIds, targetDegree, excludedPairKeys){
+    function keyOf(a,b){ return a<b ? a+"|"+b : b+"|"+a; }
+    function tryOnce(){
+      var need = {}; teamIds.forEach(function(id){ need[id] = targetDegree[id]||0; });
+      var played = {}; Object.keys(excludedPairKeys||{}).forEach(function(k){ played[k]=true; });
+      var pairs = [];
+      var guard = 0;
+      while (true){
+        guard++; if (guard>5000) return null;
+        var pool = teamIds.filter(function(id){ return need[id]>0; });
+        if (pool.length===0) return pairs;
+        if (pool.length===1) return null;
+        shuffle(pool);
+        pool.sort(function(a,b){ return need[b]-need[a]; });
+        var a = pool[0], found = false;
+        for (var i=1;i<pool.length;i++){
+          var b = pool[i], k = keyOf(a,b);
+          if (played[k]) continue;
+          pairs.push([a,b]); played[k]=true;
+          need[a]--; need[b]--;
+          found = true;
+          break;
+        }
+        if (!found) return null;
+      }
+    }
+    for (var attempt=0; attempt<300; attempt++){
+      var res = tryOnce();
+      if (res) return res;
+    }
+    return null;
+  }
+  // Greedy round assignment for the newly-built pairs only (fixed matches
+  // keep their own real round numbers): puts each pair in the earliest
+  // round where neither team is already playing, which gives
+  // scheduleWithRest the same kind of round-major structure computeDraw's
+  // own round-robin output has, for comparable schedule quality.
+  function assignNewRounds(pairs, teamIds, roundBase){
+    var lastRound = {}; teamIds.forEach(function(id){ lastRound[id]=roundBase; });
+    return pairs.map(function(pr){
+      var a=pr[0], b=pr[1];
+      var r = Math.max(lastRound[a], lastRound[b]) + 1;
+      lastRound[a]=r; lastRound[b]=r;
+      return { round:r, home:a, away:b };
+    });
+  }
+  // Validates a proposed (withdrawIds, fixedIdx) selection and, if valid,
+  // computes the full replacement { teams, matches } — called once to
+  // preview/confirm and again, identically, to commit (randomized, so the
+  // two calls can differ; the UI only ever commits what it just previewed).
+  function computePartialRedraw(withdrawIds, fixedIdx){
+    if (state.playoff && state.playoff.active){
+      return { error: "Playoff aktifken kısmi yeniden kura çekilemez. Önce playoff'u sıfırlayın." };
+    }
+    var fixedMatches = state.matches.filter(function(m,idx){ return !!fixedIdx[idx]; });
+    var otherMatches = state.matches.filter(function(m,idx){ return !fixedIdx[idx]; });
+    var badWithdraw = fixedMatches.some(function(m){ return withdrawIds[m.home] || withdrawIds[m.away]; });
+    if (badWithdraw) return { error: "Çekilen bir takımın maçı sabit olarak işaretlenemez." };
+    var lostResult = otherMatches.some(function(m){ return m.hs!=null && m.as!=null; });
+    if (lostResult) return { error: "Sabit işaretlenmeyen bazı maçların sonucu zaten girilmiş. Bu işlem onları siler — önce o maçları sabit işaretleyin ya da sonuçlarını temizleyin." };
+    var newTeams = state.teams.filter(function(t){ return !withdrawIds[t.id]; });
+    var newTeamIds = newTeams.map(function(t){ return t.id; });
+    if (newTeamIds.length<2) return { error: "En az 2 takım kalmalı." };
+    var rounds = state.settings.rounds || 4;
+    var fixedCount = {}; newTeamIds.forEach(function(id){ fixedCount[id]=0; });
+    fixedMatches.forEach(function(m){ if (fixedCount[m.home]!=null) fixedCount[m.home]++; if (fixedCount[m.away]!=null) fixedCount[m.away]++; });
+    var targetDegree = {}, degreeError = null;
+    newTeamIds.forEach(function(id){
+      var d = rounds - fixedCount[id];
+      if (d<0) degreeError = true;
+      targetDegree[id] = Math.max(0,d);
+    });
+    if (degreeError) return { error: "Bir takımın sabit maç sayısı, takım başına maç sayısını aşıyor." };
+    var excludedPairKeys = {};
+    fixedMatches.forEach(function(m){ excludedPairKeys[m.home<m.away ? m.home+"|"+m.away : m.away+"|"+m.home] = true; });
+    var pairs = buildExtraPairs(newTeamIds, targetDegree, excludedPairKeys);
+    if (!pairs) return { error: "Kura hesaplanamadı, tekrar deneyin." };
+    var maxFixedRound = fixedMatches.reduce(function(mx,m){ return Math.max(mx,m.round); }, 0);
+    var newFlat = assignNewRounds(pairs, newTeamIds, maxFixedRound);
+    var maxFixedDay = fixedMatches.reduce(function(mx,m){ return Math.max(mx,m.dayIndex); }, -1);
+    var dayOffset = maxFixedDay + 1;
+    var seedLastDay = {};
+    fixedMatches.forEach(function(m){
+      seedLastDay[m.home] = Math.max(seedLastDay[m.home]==null?-Infinity:seedLastDay[m.home], m.dayIndex);
+      seedLastDay[m.away] = Math.max(seedLastDay[m.away]==null?-Infinity:seedLastDay[m.away], m.dayIndex);
+    });
+    var nameById = {}; newTeams.forEach(function(t){ nameById[t.id]=t.name; });
+    var scheduled = scheduleWithRest(newFlat, newTeamIds, state.settings.matchesPerDay, state.settings.startDate, nameById, state.settings.blackoutRanges, dayOffset, seedLastDay);
+    var newMatches = scheduled.map(function(s){ return { round:s.round, home:s.home, away:s.away, hs:null, as:null, dayIndex:s.dayIndex, slotPos:s.slotPos, events:[] }; });
+    var finalMatches = fixedMatches.concat(newMatches);
+    return { teams:newTeams, matches:finalMatches, fixedCount:fixedMatches.length, drawnCount:newMatches.length, withdrawnCount:(state.teams.length-newTeams.length) };
+  }
+
   // Live, phase-gated reveal ceremony: the full draw is computed instantly,
   // then revealed round-by-round ("tur"). Within a round, matches reveal
   // one team name at a time (home, then away, ~2s apart) as a big spotlight
@@ -978,6 +1104,52 @@
     state.playoff = null;
     uiState.confirmReset = false;
     render(); persist();
+  }
+  function togglePartialRedrawPanel(){
+    var pr = uiState.partialRedraw;
+    pr.open = !pr.open;
+    if (!pr.open){ pr.withdrawIds={}; pr.fixedIdx={}; pr.confirm=false; pr.error=null; pr.preview=null; }
+    render();
+  }
+  function togglePartialWithdraw(teamId){
+    var pr = uiState.partialRedraw;
+    if (pr.withdrawIds[teamId]) delete pr.withdrawIds[teamId]; else pr.withdrawIds[teamId]=true;
+    pr.confirm=false; pr.error=null; pr.preview=null;
+    render();
+  }
+  function togglePartialFixed(idx){
+    var pr = uiState.partialRedraw;
+    idx = parseInt(idx,10);
+    if (pr.fixedIdx[idx]) delete pr.fixedIdx[idx]; else pr.fixedIdx[idx]=true;
+    pr.confirm=false; pr.error=null; pr.preview=null;
+    render();
+  }
+  function askPartialRedraw(){
+    var pr = uiState.partialRedraw;
+    var result = computePartialRedraw(pr.withdrawIds, pr.fixedIdx);
+    if (result.error){ pr.error = result.error; pr.confirm=false; pr.preview=null; render(); return; }
+    pr.error = null; pr.preview = result; pr.confirm = true;
+    render();
+  }
+  function executePartialRedraw(){
+    var pr = uiState.partialRedraw;
+    // Re-computed fresh at commit time (randomized, so this is a new draw,
+    // not necessarily identical to the preview) rather than reusing
+    // pr.preview — the preview's only job was to prove the selection is
+    // valid and show roughly what to expect.
+    var result = computePartialRedraw(pr.withdrawIds, pr.fixedIdx);
+    if (result.error){ pr.error = result.error; pr.confirm=false; pr.preview=null; render(); return; }
+    state.teams = result.teams;
+    state.matches = result.matches;
+    uiState.partialRedraw = { open:false, withdrawIds:{}, fixedIdx:{}, confirm:false, error:null, preview:null };
+    uiState.expandedMatches = {};
+    render(); persist();
+    toast(result.withdrawnCount+" takım çekildi, "+result.drawnCount+" maç yeniden çekildi.");
+  }
+  function cancelPartialRedrawConfirm(){
+    uiState.partialRedraw.confirm = false;
+    uiState.partialRedraw.preview = null;
+    render();
   }
   function updateScore(ref, side, value){
     var v = value==="" ? null : Math.max(0, Math.min(99, parseInt(value,10)||0));
@@ -1328,9 +1500,11 @@
       drawBlock = '<div class="btn-row">' +
         (uiState.confirmReset
           ? '<span class="note"><b>Emin misiniz?</b> Girilmiş tüm sonuçlar silinir.</span> <button class="btn btn-ghost" data-action="reset-execute">Evet, yeniden çek</button> <button class="btn btn-ghost" data-action="reset-cancel">Vazgeç</button>'
-          : '<button class="btn btn-primary" data-action="download">Fikstürü İndir (JSON)</button> <button class="btn btn-ghost" data-action="reschedule-days">Fikstürü Güne Göre Yeniden Düzenle</button> <button class="btn btn-ghost" data-action="reset-ask">Kurayı Yenile</button>') +
+          : '<button class="btn btn-primary" data-action="download">Fikstürü İndir (JSON)</button> <button class="btn btn-ghost" data-action="reschedule-days">Fikstürü Güne Göre Yeniden Düzenle</button> <button class="btn btn-ghost" data-action="reset-ask">Kurayı Yenile</button> <button class="btn btn-ghost" data-action="partial-redraw-toggle">'+(uiState.partialRedraw.open?'Kısmi Yeniden Kurayı Kapat':'Kısmi Yeniden Kura')+'</button>') +
         '</div>';
     }
+
+    var partialRedrawBlock = (drawn && uiState.partialRedraw.open) ? renderPartialRedrawPanel(state) : '';
 
     var fixtureBlock = drawn ? ('<div class="section-head"><h2>Sonuç Girişi</h2><span class="section-sub">'+fmtDateLong(new Date(state.drawnAt))+' tarihinde çekildi</span></div>' + renderFixtureList(state, true)) : '';
 
@@ -1356,7 +1530,7 @@
         : '<div class="btn-row"><button class="btn btn-danger" data-action="wipe-all-ask">Her Şeyi Temizle</button></div>') +
     '</div>';
 
-    return '<div class="stage">' + renderSummaryStrip(state) + settingsBlock + teamsBlock + rosterBlock + drawBlock + fixtureBlock + playoffBlock + dangerZoneBlock + '</div>';
+    return '<div class="stage">' + renderSummaryStrip(state) + settingsBlock + teamsBlock + rosterBlock + drawBlock + partialRedrawBlock + fixtureBlock + playoffBlock + dangerZoneBlock + '</div>';
   }
 
   function renderMatchDetail(state, m, idx){
@@ -1382,6 +1556,55 @@
         '<div class="event-chip-list">'+(rows||'<span class="note">Henüz yok.</span>')+'</div></div>';
     }
     return '<div class="match-detail">'+section("goal","Goller",null)+section("yellow","Sarı Kartlar","card-icon-yellow")+section("red","Kırmızı Kartlar","card-icon-red")+'</div>';
+  }
+
+  // Lets the admin pick withdrawing teams and the handful of matches that
+  // stay fixed (already played, already announced, whatever), then redraws
+  // everything else so every remaining team still lands on the same total
+  // match count (state.settings.rounds). See computePartialRedraw.
+  function renderPartialRedrawPanel(state){
+    var pr = uiState.partialRedraw;
+    var teamChips = state.teams.slice().sort(function(a,b){ return a.name.localeCompare(b.name,"tr"); }).map(function(t){
+      var checked = !!pr.withdrawIds[t.id];
+      return '<label class="pr-chip'+(checked?' checked':'')+'"><input type="checkbox" data-pr-withdraw="'+esc(t.id)+'" '+(checked?'checked':'')+'><span>'+esc(t.name)+'</span></label>';
+    }).join('');
+
+    var cal = calendar(state);
+    var groups = {};
+    state.matches.forEach(function(m,idx){ (groups[m.dayIndex]=groups[m.dayIndex]||[]).push({m:m, idx:idx}); });
+    var matchGroupsHtml = "";
+    for (var di=0; di<cal.length; di++){
+      if (!groups[di]) continue;
+      var date = cal[di];
+      var rows = groups[di].map(function(x){
+        var m=x.m, idx=x.idx, checked = !!pr.fixedIdx[idx];
+        var played = m.hs!=null && m.as!=null;
+        var scorePart = '<span class="score-static">'+(played?(m.hs+' : '+m.as):'vs')+'</span>';
+        return '<label class="pr-match-row'+(checked?' checked':'')+'"><input type="checkbox" data-pr-fixed="'+idx+'" '+(checked?'checked':'')+'>' +
+          '<span class="tag">'+m.round+'. TUR</span><span class="tag time mono">'+timeForSlotPos(state,m.slotPos)+'</span>' +
+          '<span class="side home">'+esc(teamName(state,m.home))+'</span>'+scorePart+'<span class="side">'+esc(teamName(state,m.away))+'</span></label>';
+      }).join('');
+      matchGroupsHtml += '<div class="day-group"><div class="day-head"><span class="d1">'+DAYS_TR[date.getDay()]+'</span><span class="d2">'+fmtDateShort(date)+'</span></div>'+rows+'</div>';
+    }
+
+    var errorNote = pr.error ? ('<div class="note" style="color:var(--brick);margin-top:10px"><b>'+esc(pr.error)+'</b></div>') : '';
+    var actionBlock;
+    if (pr.confirm && pr.preview){
+      actionBlock = '<div class="note" style="margin-top:10px"><b>'+pr.preview.withdrawnCount+' takım çekiliyor, '+pr.preview.fixedCount+' maç sabit kalıyor, '+pr.preview.drawnCount+' maç yeniden çekilecek.</b> Sonuç, girilmiş olan diğer maçlardaki skor ve kart bilgilerini etkilemez.</div>' +
+        '<div class="btn-row" style="margin-top:10px"><button class="btn btn-primary" data-action="partial-redraw-execute">Evet, kalan maçları çek</button> <button class="btn btn-ghost" data-action="partial-redraw-cancel-confirm">Vazgeç</button></div>';
+    } else {
+      actionBlock = '<div class="btn-row" style="margin-top:10px"><button class="btn btn-primary" data-action="partial-redraw-ask">Kalan Maçları Çek</button></div>';
+    }
+
+    return '<div class="panel">' +
+      '<div class="section-head"><h2>Kısmi Yeniden Kura</h2></div>' +
+      '<div class="note">Aşağıda çekilen takımları ve sabit kalacak maçları işaretleyin — işaretlenmeyen tüm maçlar silinip yeniden çekilir, her takım yine toplam '+(state.settings.rounds||4)+' maça tamamlanır.</div>' +
+      '<div class="note" style="margin-top:10px;margin-bottom:6px">Çekilen takımlar</div>' +
+      '<div class="team-grid">'+(teamChips||'<span class="note">Takım yok.</span>')+'</div>' +
+      '<div class="note" style="margin-top:16px;margin-bottom:6px">Sabit kalacak maçlar</div>' +
+      '<div class="stage">'+(matchGroupsHtml||'<span class="note">Maç yok.</span>')+'</div>' +
+      errorNote + actionBlock +
+    '</div>';
   }
 
   function renderFixtureList(state, editable){
@@ -1672,6 +1895,10 @@
     else if (action==="wipe-all-execute") wipeAllExecute();
     else if (action==="reset-playoff-date") resetPlayoffMatchDate(btn.dataset.matchIdx);
     else if (action==="delete-oneri") deleteOneri(btn.dataset.oneriId);
+    else if (action==="partial-redraw-toggle") togglePartialRedrawPanel();
+    else if (action==="partial-redraw-ask") askPartialRedraw();
+    else if (action==="partial-redraw-execute") executePartialRedraw();
+    else if (action==="partial-redraw-cancel-confirm") cancelPartialRedrawConfirm();
   });
 
   document.getElementById("content").addEventListener("keydown", function(e){
@@ -1695,6 +1922,8 @@
     if (t.id==="ozetTeamSelect"){ uiState.selectedTeamId=t.value; render(); return; }
     if (t.id==="rosterTeamSelect"){ uiState.rosterTeamId=t.value; render(); return; }
     if (t.dataset.playerNumber){ var pn=t.dataset.playerNumber.split(":"); updatePlayerNumber(pn[0], pn[1], t.value); return; }
+    if (t.dataset.prWithdraw){ togglePartialWithdraw(t.dataset.prWithdraw); return; }
+    if (t.dataset.prFixed!=null){ togglePartialFixed(t.dataset.prFixed); return; }
   });
 
   // ---- boot ----
