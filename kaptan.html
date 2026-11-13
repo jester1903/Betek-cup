@@ -599,8 +599,7 @@
     var rows = computeStandings(state);
     var body = rows.map(function(r,i){
       var divider = (i===8 && rows.length>8) ? '<tr class="po-divider"><td colspan="11"><span class="po-divider-line">Playoff hattı</span></td></tr>' : '';
-      var forfeitTag = r.forfeits ? ' <span class="forfeit-badge" title="'+r.forfeits+' maça hükmen mağlup">H×'+r.forfeits+'</span>' : '';
-      return divider + '<tr'+(i<8?' class="po-qualify"':'')+'><td>'+(i+1)+'</td><td class="team-cell">'+esc(r.name)+forfeitTag+'</td><td>'+r.played+'</td><td>'+r.won+'</td><td>'+r.draw+'</td><td>'+r.lost+'</td><td>'+(r.avg>0?'+':'')+r.avg+'</td><td>'+r.yellowCards+'</td><td>'+r.redCards+'</td><td class="pts">'+r.pts+'</td></tr>';
+      return divider + '<tr'+(i<8?' class="po-qualify"':'')+'><td>'+(i+1)+'</td><td class="team-cell">'+esc(r.name)+'</td><td>'+r.played+'</td><td>'+r.won+'</td><td>'+r.draw+'</td><td>'+r.lost+'</td><td>'+(r.avg>0?'+':'')+r.avg+'</td><td>'+r.yellowCards+'</td><td>'+r.redCards+'</td><td class="pts">'+r.pts+'</td></tr>';
     }).join('');
     var table = '<div class="panel" style="overflow-x:auto"><table class="standings-table"><thead><tr><th></th><th>Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>AV</th><th title="Sarı Kart">SK</th><th title="Kırmızı Kart">KK</th><th>P</th></tr></thead><tbody>'+body+'</tbody></table>' +
       '<div class="note" style="margin-top:10px">Sıralama kuralı (puan eşitliğinde sırasıyla):<ol style="margin:6px 0 0;padding-left:18px;line-height:1.6">' +
