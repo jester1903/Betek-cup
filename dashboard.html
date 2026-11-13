@@ -283,7 +283,7 @@ function computeSuspensions(){
       var yellowsThisMatch = {};
       (m.events||[]).forEach(function(ev){ if (ev.teamId!==teamId||ev.type!=="yellow") return; yellowsThisMatch[ev.playerId]=(yellowsThisMatch[ev.playerId]||0)+1; });
       Object.keys(yellowsThisMatch).forEach(function(pid){
-        if (yellowsThisMatch[pid]===1){ yellowAcc[pid]=(yellowAcc[pid]||0)+1; if (yellowAcc[pid]>=2){ banRemaining[pid]=(banRemaining[pid]||0)+1; yellowAcc[pid]-=2; } }
+        if (yellowsThisMatch[pid]===1){ yellowAcc[pid]=(yellowAcc[pid]||0)+1; if (yellowAcc[pid]>=3){ banRemaining[pid]=(banRemaining[pid]||0)+1; yellowAcc[pid]-=3; } }
       });
       (m.events||[]).forEach(function(ev){ if (ev.teamId!==teamId||ev.type!=="red") return; banRemaining[ev.playerId]=(banRemaining[ev.playerId]||0)+1; });
     }

@@ -446,7 +446,7 @@
         var yellowsThisMatch = {};
         (m.events||[]).forEach(function(ev){ if (ev.teamId!==teamId||ev.type!=="yellow") return; yellowsThisMatch[ev.playerId]=(yellowsThisMatch[ev.playerId]||0)+1; });
         Object.keys(yellowsThisMatch).forEach(function(pid){
-          if (yellowsThisMatch[pid]===1){ yellowAcc[pid]=(yellowAcc[pid]||0)+1; if (yellowAcc[pid]>=2){ banRemaining[pid]=(banRemaining[pid]||0)+1; yellowAcc[pid]-=2; } }
+          if (yellowsThisMatch[pid]===1){ yellowAcc[pid]=(yellowAcc[pid]||0)+1; if (yellowAcc[pid]>=3){ banRemaining[pid]=(banRemaining[pid]||0)+1; yellowAcc[pid]-=3; } }
         });
         (m.events||[]).forEach(function(ev){ if (ev.teamId!==teamId||ev.type!=="red") return; banRemaining[ev.playerId]=(banRemaining[ev.playerId]||0)+1; });
       }
@@ -670,7 +670,7 @@
 
   function renderGolKrallik(state){
     if (!state.drawnAt) return '<div class="stage">'+renderSummaryStrip(state)+'<div class="panel empty-state">Gol krallığı, kura çekildikten sonra burada görünecek.</div></div>';
-    var rows = computeTopScorers(state);
+    var rows = computeTopScorers(state).slice(0,10);
     var list = rows.map(function(r,i){
       return '<div class="leader-row"><span class="leader-rank">'+(i+1)+'</span><span class="leader-name">'+esc(r.name)+'</span><span class="leader-team">'+esc(r.teamName)+'</span><span class="leader-count">'+r.goals+'</span></div>';
     }).join('');
