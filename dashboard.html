@@ -62,6 +62,7 @@
   .scorer-row .n{ margin-left:auto; font-family:var(--font-mono); font-weight:600; color:var(--gold); }
   .card-row{ display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--surface-2); font-size:17px; }
   .susp-tag{ font-family:var(--font-mono); font-size:12px; color:var(--brick); margin-left:auto; white-space:nowrap; }
+  .forfeit-tag{ font-family:var(--font-mono); font-size:11px; color:var(--brick); border:1px solid var(--brick); border-radius:4px; padding:2px 5px; white-space:nowrap; margin-left:4px; }
 
   /* playoff slide */
   .ko-cols{ flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; }
@@ -178,7 +179,7 @@ function normalizeState(d){
   }
   if (Array.isArray(d.teams)) f.teams = d.teams.map(function(t){ return { id:t.id, name:t.name, players:Array.isArray(t.players)?t.players:[] }; });
   if (Array.isArray(d.matches)) f.matches = d.matches.map(function(m){
-    return { round:m.round, home:m.home, away:m.away, hs:m.hs===undefined?null:m.hs, as:m.as===undefined?null:m.as, dayIndex:m.dayIndex, slotPos:m.slotPos, events:Array.isArray(m.events)?m.events:[] };
+    return { round:m.round, home:m.home, away:m.away, hs:m.hs===undefined?null:m.hs, as:m.as===undefined?null:m.as, dayIndex:m.dayIndex, slotPos:m.slotPos, events:Array.isArray(m.events)?m.events:[], forfeit: m.forfeit==null?null:m.forfeit };
   });
   if (d.drawnAt) f.drawnAt = d.drawnAt;
   f.playoff = normalizePlayoff(d.playoff);
@@ -216,7 +217,7 @@ function timeForSlotPos(pos){ if (pos===0) return state.settings.slot1Time; if (
 // goals scored, fewer yellow cards, fewer red cards.
 function computeStandings(){
   var table = {};
-  state.teams.forEach(function(t){ table[t.id] = {teamId:t.id, name:t.name, played:0, won:0, draw:0, lost:0, gf:0, ga:0, redCards:0, yellowCards:0}; });
+  state.teams.forEach(function(t){ table[t.id] = {teamId:t.id, name:t.name, played:0, won:0, draw:0, lost:0, gf:0, ga:0, redCards:0, yellowCards:0, forfeits:0}; });
   state.matches.forEach(function(m){
     (m.events||[]).forEach(function(ev){
       var r = table[ev.teamId];
@@ -224,6 +225,7 @@ function computeStandings(){
       if (ev.type==="red") r.redCards++;
       else if (ev.type==="yellow") r.yellowCards++;
     });
+    if (m.forfeit && table[m.forfeit]) table[m.forfeit].forfeits++;
     if (m.hs==null || m.as==null) return;
     var h=table[m.home], a=table[m.away];
     if (!h||!a) return;
@@ -231,7 +233,7 @@ function computeStandings(){
     if (m.hs>m.as){ h.won++; a.lost++; } else if (m.hs<m.as){ a.won++; h.lost++; } else { h.draw++; a.draw++; }
   });
   var rows = Object.keys(table).map(function(id){ var r=table[id]; r.avg=r.gf-r.ga; r.pts=r.won*3+r.draw; return r; });
-  rows.sort(function(a,b){ return (b.pts-a.pts)||(b.avg-a.avg)||(b.gf-a.gf)||(a.yellowCards-b.yellowCards)||(a.redCards-b.redCards)||a.name.localeCompare(b.name,"tr"); });
+  rows.sort(function(a,b){ return (b.pts-a.pts)||(a.forfeits-b.forfeits)||(b.avg-a.avg)||(b.gf-a.gf)||(a.yellowCards-b.yellowCards)||(a.redCards-b.redCards)||a.name.localeCompare(b.name,"tr"); });
   return rows;
 }
 function allMatchesWithEvents(){
@@ -373,7 +375,8 @@ function renderStandingsSlide(slide){
   var pageStats = stats.slice(start, start+PAGE_SIZE);
   var rows = pageStats.map(function(s,i){
     var rank = start+i+1;
-    return '<tr class="'+(rank<=8?'top8':'')+'"><td class="rank mono">'+rank+'</td><td>'+esc(s.name)+'</td>' +
+    var forfeitTag = s.forfeits ? ' <span class="forfeit-tag" title="'+s.forfeits+' maça hükmen mağlup">H×'+s.forfeits+'</span>' : '';
+    return '<tr class="'+(rank<=8?'top8':'')+'"><td class="rank mono">'+rank+'</td><td>'+esc(s.name)+forfeitTag+'</td>' +
       '<td class="num">'+s.played+'</td><td class="num">'+s.won+'</td><td class="num">'+s.draw+'</td><td class="num">'+s.lost+'</td>' +
       '<td class="num">'+(s.avg>0?'+':'')+s.avg+'</td><td class="num">'+s.yellowCards+'</td><td class="num">'+s.redCards+'</td><td class="num pts">'+s.pts+'</td></tr>';
   }).join('');
@@ -381,6 +384,7 @@ function renderStandingsSlide(slide){
     '<div class="slide-title"><h2>Puan Durumu</h2><span class="sub">'+(slide.pages>1?('Sayfa '+(slide.page+1)+'/'+slide.pages+' · '):'')+'İlk 8 play-off\'a yükselir</span></div>' +
     '<table class="standings-table"><thead><tr><th>#</th><th>Takım</th><th class="num">O</th><th class="num">G</th><th class="num">B</th><th class="num">M</th><th class="num">Av</th><th class="num" title="Sarı Kart">SK</th><th class="num" title="Kırmızı Kart">KK</th><th class="num">Puan</th></tr></thead><tbody>'+(rows||'')+'</tbody></table>' +
     '<div class="standings-note">Sıralama kuralı (puan eşitliğinde sırasıyla):<ol style="margin:4px 0 0;padding-left:16px;line-height:1.4">' +
+      '<li>Hiç hükmen mağlubiyeti olmayan takım önde</li>' +
       '<li>Genel averaj</li>' +
       '<li>Atılan gol sayısı (fazla olan önde)</li>' +
       '<li>Sarı kart sayısı (az olan önde)</li>' +

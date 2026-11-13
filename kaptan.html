@@ -88,6 +88,7 @@
   .leader-team{ color:var(--ink-muted); font-size:11.5px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .leader-count{ font-family:var(--font-mono); font-weight:700; flex:none; min-width:20px; text-align:center; }
   .susp-badge{ font-family:var(--font-mono); font-size:9px; color:var(--brick); border:1px solid var(--brick); border-radius:4px; padding:3px 5px; flex:none; white-space:nowrap; }
+  .forfeit-badge{ font-family:var(--font-mono); font-size:9px; color:var(--brick); border:1px solid var(--brick); border-radius:4px; padding:3px 5px; flex:none; white-space:nowrap; margin-left:5px; }
   .card-icon{ display:inline-block; width:9px; height:13px; border-radius:2px; vertical-align:-2px; }
   .card-icon-yellow{ background:#E8B923; }
   .card-icon-red{ background:#C4402C; }
@@ -205,11 +206,12 @@
       .map(function(r){ return { start:r.start, end:r.end }; });
   }
   function normalizePlayoffMatch(m){
-    if (!m) return { home:null, away:null, hs:null, as:null, events:[], dayIndex:null, slotPos:null, overrideDate:null, overrideTime:null };
+    if (!m) return { home:null, away:null, hs:null, as:null, events:[], dayIndex:null, slotPos:null, overrideDate:null, overrideTime:null, forfeit:null };
     var dRe = /^\d{4}-\d{2}-\d{2}$/, tRe = /^\d{2}:\d{2}$/;
     return { home:m.home===undefined?null:m.home, away:m.away===undefined?null:m.away, hs:m.hs===undefined?null:m.hs, as:m.as===undefined?null:m.as, events:Array.isArray(m.events)?m.events:[], dayIndex:(m.dayIndex==null?null:m.dayIndex), slotPos:(m.slotPos==null?null:m.slotPos),
       overrideDate: (typeof m.overrideDate==="string" && dRe.test(m.overrideDate)) ? m.overrideDate : null,
-      overrideTime: (typeof m.overrideTime==="string" && tRe.test(m.overrideTime)) ? m.overrideTime : null };
+      overrideTime: (typeof m.overrideTime==="string" && tRe.test(m.overrideTime)) ? m.overrideTime : null,
+      forfeit: m.forfeit==null ? null : m.forfeit };
   }
   function normalizePlayoff(d){
     if (!d || !d.active) return null;
@@ -237,7 +239,7 @@
     }
     if (Array.isArray(d.teams)) f.teams = d.teams.map(function(t){ return { id:t.id, name:t.name, players:Array.isArray(t.players)?t.players:[] }; });
     if (Array.isArray(d.matches)) f.matches = d.matches.map(function(m){
-      return { round:m.round, home:m.home, away:m.away, hs:m.hs===undefined?null:m.hs, as:m.as===undefined?null:m.as, dayIndex:m.dayIndex, slotPos:m.slotPos, events:Array.isArray(m.events)?m.events:[] };
+      return { round:m.round, home:m.home, away:m.away, hs:m.hs===undefined?null:m.hs, as:m.as===undefined?null:m.as, dayIndex:m.dayIndex, slotPos:m.slotPos, events:Array.isArray(m.events)?m.events:[], forfeit: m.forfeit==null?null:m.forfeit };
     });
     if (d.drawnAt) f.drawnAt = d.drawnAt;
     f.playoff = normalizePlayoff(d.playoff);
@@ -362,7 +364,7 @@
   // cards, then fewer red cards.
   function computeStandings(state){
     var table = {};
-    state.teams.forEach(function(t){ table[t.id] = {teamId:t.id, name:t.name, played:0, won:0, draw:0, lost:0, gf:0, ga:0, redCards:0, yellowCards:0}; });
+    state.teams.forEach(function(t){ table[t.id] = {teamId:t.id, name:t.name, played:0, won:0, draw:0, lost:0, gf:0, ga:0, redCards:0, yellowCards:0, forfeits:0}; });
     state.matches.forEach(function(m){
       (m.events||[]).forEach(function(ev){
         var r = table[ev.teamId];
@@ -370,6 +372,7 @@
         if (ev.type==="red") r.redCards++;
         else if (ev.type==="yellow") r.yellowCards++;
       });
+      if (m.forfeit && table[m.forfeit]) table[m.forfeit].forfeits++;
       if (m.hs==null || m.as==null) return;
       var h=table[m.home], a=table[m.away];
       if (!h||!a) return;
@@ -377,7 +380,7 @@
       if (m.hs>m.as){ h.won++; a.lost++; } else if (m.hs<m.as){ a.won++; h.lost++; } else { h.draw++; a.draw++; }
     });
     var rows = Object.keys(table).map(function(id){ var r=table[id]; r.avg=r.gf-r.ga; r.pts=r.won*3+r.draw; return r; });
-    rows.sort(function(a,b){ return (b.pts-a.pts)||(b.avg-a.avg)||(b.gf-a.gf)||(a.yellowCards-b.yellowCards)||(a.redCards-b.redCards)||a.name.localeCompare(b.name,"tr"); });
+    rows.sort(function(a,b){ return (b.pts-a.pts)||(a.forfeits-b.forfeits)||(b.avg-a.avg)||(b.gf-a.gf)||(a.yellowCards-b.yellowCards)||(a.redCards-b.redCards)||a.name.localeCompare(b.name,"tr"); });
     return rows;
   }
   function allMatchesWithEvents(state){
@@ -596,10 +599,12 @@
     var rows = computeStandings(state);
     var body = rows.map(function(r,i){
       var divider = (i===8 && rows.length>8) ? '<tr class="po-divider"><td colspan="11"><span class="po-divider-line">Playoff hattı</span></td></tr>' : '';
-      return divider + '<tr'+(i<8?' class="po-qualify"':'')+'><td>'+(i+1)+'</td><td class="team-cell">'+esc(r.name)+'</td><td>'+r.played+'</td><td>'+r.won+'</td><td>'+r.draw+'</td><td>'+r.lost+'</td><td>'+(r.avg>0?'+':'')+r.avg+'</td><td>'+r.yellowCards+'</td><td>'+r.redCards+'</td><td class="pts">'+r.pts+'</td></tr>';
+      var forfeitTag = r.forfeits ? ' <span class="forfeit-badge" title="'+r.forfeits+' maça hükmen mağlup">H×'+r.forfeits+'</span>' : '';
+      return divider + '<tr'+(i<8?' class="po-qualify"':'')+'><td>'+(i+1)+'</td><td class="team-cell">'+esc(r.name)+forfeitTag+'</td><td>'+r.played+'</td><td>'+r.won+'</td><td>'+r.draw+'</td><td>'+r.lost+'</td><td>'+(r.avg>0?'+':'')+r.avg+'</td><td>'+r.yellowCards+'</td><td>'+r.redCards+'</td><td class="pts">'+r.pts+'</td></tr>';
     }).join('');
     var table = '<div class="panel" style="overflow-x:auto"><table class="standings-table"><thead><tr><th></th><th>Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>AV</th><th title="Sarı Kart">SK</th><th title="Kırmızı Kart">KK</th><th>P</th></tr></thead><tbody>'+body+'</tbody></table>' +
       '<div class="note" style="margin-top:10px">Sıralama kuralı (puan eşitliğinde sırasıyla):<ol style="margin:6px 0 0;padding-left:18px;line-height:1.6">' +
+        '<li>Hiç hükmen mağlubiyeti olmayan takım önde</li>' +
         '<li>Genel averaj</li>' +
         '<li>Atılan gol sayısı (fazla olan önde)</li>' +
         '<li>Sarı kart sayısı (az olan önde)</li>' +
